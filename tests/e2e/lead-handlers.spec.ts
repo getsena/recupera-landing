@@ -10,7 +10,13 @@ type Call = { method: string; url: string; body: unknown }
 const FUENTES_VALIDAS = ['Ads', 'Orgánico', 'Referido', 'Outbound/Piloto BBDD', 'MetaRecsa']
 
 // Simula HubSpot (y Meta). `contactPost` define las respuestas sucesivas al crear contacto.
-function mockHubspot(opts: { contactPost?: { status: number; json: unknown }[] } = {}) {
+function mockHubspot(
+  opts: {
+    contactPost?: { status: number; json: unknown }[]
+    existing?: { id: string; properties: Record<string, string | null> }
+    dealsFound?: number
+  } = {}
+) {
   const calls: Call[] = []
   let contactPosts = 0
   const original = globalThis.fetch
@@ -20,7 +26,13 @@ function mockHubspot(opts: { contactPost?: { status: number; json: unknown }[] }
     calls.push({ method, url, body })
     const json = (status: number, data: unknown) =>
       new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
-    if (url.includes('/contacts/search')) return json(200, { total: 0, results: [] })
+    if (url.includes('/contacts/search')) {
+      return opts.existing
+        ? json(200, { total: 1, results: [opts.existing] })
+        : json(200, { total: 0, results: [] })
+    }
+    if (url.includes('/deals/search')) return json(200, { total: opts.dealsFound ?? 0, results: [] })
+    if (method === 'PATCH') return json(200, { id: opts.existing?.id ?? '0' })
     if (method === 'POST' && url.endsWith('/crm/v3/objects/contacts')) {
       const r = opts.contactPost?.[contactPosts++] ?? { status: 201, json: { id: '77' } }
       return json(r.status, r.json)
@@ -298,5 +310,88 @@ test.describe('smoke tests: los emails +smoke no se reportan a Meta', () => {
     expect(isSmokeTest('smoke+1@gmail.com')).toBe(false)
     expect(isSmokeTest('smoke+1@somossena.com.evil.cl')).toBe(false)
     expect(isSmokeTest('ana+ventas@somossena.com')).toBe(false)
+  })
+})
+
+test.describe('/api/lead: el lead no se pierde por errores de HubSpot', () => {
+  test('si el reintento también falla por una propiedad no clasificada, guarda solo los campos núcleo', async () => {
+    const m = mockHubspot({
+      contactPost: [
+        { status: 400, json: { errors: [{ code: 'INVALID_OPTION' }] } },
+        { status: 400, json: { message: '[{"error":"PROPERTY_DOESNT_EXIST","name":"landing_page"}]' } },
+        { status: 201, json: { id: '79' } },
+      ],
+    })
+    try {
+      const res = await postLead(
+        req({ ...leadPayload, gclid: 'abc', landingPage: 'https://recupera.somossena.com/' })
+      )
+      expect(res.status).toBe(200)
+      const writes = contactWrites(m.calls)
+      expect(writes).toHaveLength(3)
+      expect(Object.keys(propsOf(writes[2])).sort()).toEqual([
+        'company',
+        'email',
+        'firstname',
+        'hubspot_owner_id',
+        'lastname',
+        'phone',
+      ])
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('un contacto existente conserva propietario y atribución, y no duplica el negocio abierto', async () => {
+    const m = mockHubspot({
+      existing: { id: '10', properties: { hubspot_owner_id: '555', origen: 'Meta', fuente_del_lead: 'Ads' } },
+      dealsFound: 1,
+    })
+    try {
+      const res = await postLead(req({ ...leadPayload, gclid: 'abc' }))
+      expect(res.status).toBe(200)
+      const patch = propsOf(m.calls.find((c) => c.method === 'PATCH') as Call)
+      for (const k of ['hubspot_owner_id', 'origen', 'fuente_del_lead']) expect(patch).not.toHaveProperty(k)
+      expect(patch.gclid).toBe('abc')
+      expect(
+        m.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/crm/v3/objects/deals'))
+      ).toHaveLength(0)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('un 409 de contacto existente actualiza ese contacto y responde ok', async () => {
+    const m = mockHubspot({
+      contactPost: [{ status: 409, json: { message: 'Contact already exists. Existing ID: 4321' } }],
+    })
+    try {
+      const res = await postLead(req(leadPayload))
+      expect(res.status).toBe(200)
+      expect(m.calls.some((c) => c.method === 'PATCH' && c.url.includes('/contacts/4321'))).toBe(true)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('los logs de error no incluyen datos personales', async () => {
+    const logs: string[] = []
+    const original = console.error
+    console.error = (...args: unknown[]) => void logs.push(args.join(' '))
+    const m = mockHubspot({
+      contactPost: [
+        { status: 400, json: { message: 'ana@acme.cl no es válido', errors: [{ code: 'INVALID_EMAIL' }] } },
+      ],
+    })
+    try {
+      const res = await postLead(req(leadPayload))
+      expect(res.status).toBe(502)
+      const salida = logs.join(' | ')
+      expect(salida).toContain('INVALID_EMAIL')
+      for (const dato of ['ana@acme.cl', '+56911111111', 'Pérez']) expect(salida).not.toContain(dato)
+    } finally {
+      console.error = original
+      m.restore()
+    }
   })
 })
