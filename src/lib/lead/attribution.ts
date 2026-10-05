@@ -1,5 +1,5 @@
 // Mapeo de atribución de leads compartido por las rutas de lead.
-// Se mueve tal cual desde src/app/api/lead/route.ts; #63 y #73 corrigen y reemplazan estas reglas.
+// Movido desde src/app/api/lead/route.ts; #73 lo reemplaza por classifyLead.
 
 export type AttributionSignals = {
   utmSource?: string
@@ -17,6 +17,8 @@ export function mapOrigen(utmSource?: string, gclid?: string, fbclid?: string): 
   return 'Orgánico'
 }
 
-export function mapFuente({ utmSource, gclid, fbclid }: AttributionSignals): string {
-  return gclid ? 'Google Ads' : fbclid ? 'Meta Ads' : utmSource ? 'Ads' : 'Orgánico'
+// fuente_del_lead en HubSpot solo acepta 'Ads' u 'Orgánico' (entre otros que no aplican a landings).
+// 'Google Ads' y 'Meta Ads' no existen y HubSpot respondía 400, con lo que el lead se perdía.
+export function mapFuente({ utmSource, gclid, fbclid }: AttributionSignals): 'Ads' | 'Orgánico' {
+  return gclid || fbclid || utmSource ? 'Ads' : 'Orgánico'
 }
