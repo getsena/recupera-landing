@@ -45,3 +45,24 @@ test.describe('submitLead: el lead se conserva si falla uno de los dos destinos'
     expect(backendCalls).toBe(1)
   })
 })
+
+test.describe('submitLead: tope de tiempo por destino', () => {
+  const hangs = () => new Promise<boolean>(() => {})
+
+  test('un destino colgado cuenta como fallo y el otro conserva el lead', async () => {
+    const r = await submitLead({ saveCrm: hangs, saveBackend: ok, timeoutMs: 50 })
+    expect(r).toEqual({ ok: true, crm: false, backend: true })
+  })
+
+  test('si ambos destinos se cuelgan, termina sin éxito', async () => {
+    const r = await submitLead({ saveCrm: hangs, saveBackend: hangs, timeoutMs: 50 })
+    expect(r).toEqual({ ok: false, crm: false, backend: false })
+  })
+
+  test('un destino lento pero dentro del tope sigue contando', async () => {
+    const slow = () => new Promise<boolean>((res) => setTimeout(() => res(true), 20))
+    const r = await submitLead({ saveCrm: slow, saveBackend: ok, timeoutMs: 500 })
+    expect(r).toEqual({ ok: true, crm: true, backend: true })
+  })
+})
+

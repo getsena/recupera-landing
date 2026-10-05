@@ -7,7 +7,7 @@ import {
   rememberLeadEventId,
 } from '@/lib/lead/clientAttribution'
 import { usePostContactForm } from '@/lib/services/contactService'
-import { submitLead } from '@/lib/lead/submit'
+import { SUBMIT_TIMEOUT_MS, submitLead } from '@/lib/lead/submit'
 import { useCountries } from '@/lib/services/countryService'
 import { useCurrencyStore } from '@/lib/store/useCurrencyStore'
 import { useToastStore } from '@/lib/store/useToastStore'
@@ -145,6 +145,7 @@ export const ContactForm = () => {
             landingPage: landingPageUrl(),
             eventId,
           }),
+          signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
         })
         const json = await res.json().catch(() => ({ ok: false }))
         return res.ok && json.ok === true
