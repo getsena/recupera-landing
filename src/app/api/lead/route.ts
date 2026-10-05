@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { mapFuente, mapOrigen } from '@/lib/lead/attribution'
+import { classifyLead } from '@/lib/lead/classify'
 
 type LeadPayload = {
   nombre: string
@@ -17,6 +17,8 @@ type LeadPayload = {
   utmContent?: string
   utmTerm?: string
   gclid?: string
+  gbraid?: string
+  wbraid?: string
   fbclid?: string
   landingPage?: string
 }
@@ -73,8 +75,15 @@ async function findContactByEmail(token: string, email: string): Promise<string 
 
 async function upsertContact(token: string, body: LeadPayload): Promise<string> {
   const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
-  const origen = mapOrigen(body.utmSource, body.gclid, body.fbclid)
-  const fuente = mapFuente(body)
+  const clasificacion = classifyLead({
+    utmSource: body.utmSource,
+    utmMedium: body.utmMedium,
+    utmCampaign: body.utmCampaign,
+    gclid: body.gclid,
+    gbraid: body.gbraid,
+    wbraid: body.wbraid,
+    fbclid: body.fbclid,
+  })
 
   const properties: Record<string, string> = {
     firstname: body.nombre,
@@ -86,14 +95,17 @@ async function upsertContact(token: string, body: LeadPayload): Promise<string> 
     interes_del_producto: INTERES_DEL_PRODUCTO,
     tipo_de_origen: 'Form landing',
     etapa_del_lead: 'Interesado',
-    origen,
-    fuente_del_lead: fuente,
+    fuente_del_lead: clasificacion.fuente,
+    origen_detalle: clasificacion.origenDetalle,
     sena_prioridad: prioridad,
     sena_intencion: calcSenaIntencion(prioridad),
     facturas_pendientes: body.facturas_pendientes,
     alguien_cobrando: normalizeCobrando(body.alguien_cobrando),
-    sena_contexto: `Lead landing Recupera. Facturas: ${body.facturas_pendientes}. Cobrando: ${body.alguien_cobrando}. Prioridad auto: ${prioridad}. Origen: ${origen}.`,
+    sena_contexto: `Lead landing Recupera. Facturas: ${body.facturas_pendientes}. Cobrando: ${body.alguien_cobrando}. Prioridad auto: ${prioridad}. Origen: ${clasificacion.origen || 'otro'}.`,
   }
+
+  // origen queda vacío para pagos de una plataforma desconocida (regla R4): no se envía.
+  if (clasificacion.origen) properties.origen = clasificacion.origen
 
   if (body.gclid) properties.gclid = body.gclid
   if (body.fbclid) properties.fbclid = body.fbclid

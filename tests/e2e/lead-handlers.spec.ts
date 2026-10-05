@@ -71,6 +71,41 @@ test.describe('/api/lead: fuente_del_lead válida', () => {
     }
   })
 
+  test('lead con gclid y campaña registrada manda origen_detalle de la taxonomía', async () => {
+    const m = mockHubspot()
+    try {
+      await postLead(req({ ...leadPayload, gclid: 'abc', utmCampaign: '23584417865' }))
+      expect(propsOf(contactWrites(m.calls)[0]).origen_detalle).toBe('google_search_recupera')
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('lead con gbraid cuenta como Google Ads', async () => {
+    const m = mockHubspot()
+    try {
+      await postLead(req({ ...leadPayload, gbraid: 'gb1' }))
+      const props = propsOf(contactWrites(m.calls)[0])
+      expect(props.origen).toBe('Google')
+      expect(props.origen_detalle).toBe('google_sin_utm')
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('pago de una plataforma desconocida no envía origen', async () => {
+    const m = mockHubspot()
+    try {
+      await postLead(req({ ...leadPayload, utmSource: 'bing', utmMedium: 'cpc' }))
+      const props = propsOf(contactWrites(m.calls)[0])
+      expect(props.fuente_del_lead).toBe('Ads')
+      expect(props).not.toHaveProperty('origen')
+      expect(props.origen_detalle).toBe('pagado_otra_plataforma')
+    } finally {
+      m.restore()
+    }
+  })
+
   test('lead con fbclid nunca manda "Meta Ads" como fuente', async () => {
     const m = mockHubspot()
     try {

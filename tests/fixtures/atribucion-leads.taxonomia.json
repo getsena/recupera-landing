@@ -1,0 +1,148 @@
+{
+  "version": "1.1.0",
+  "actualizado": "2026-10-02",
+  "dueno": "por confirmar (producto/marketing); aprobación de ventas para cambios que afecten a Francisco",
+  "descripcion": "Fuente de verdad de cómo se clasifica el origen de un lead en HubSpot. Las landings, los scripts y el test de contrato leen este archivo. Para agregar un valor: PR sobre este archivo, script que crea la opción en HubSpot y test de contrato en verde.",
+  "changelog": [
+    "1.1.0: la clave de campaña pasa a ser el id de Google Ads ({campaignid}); reglas estructuradas con normalización y casos de prueba; R4 para pago de plataforma desconocida; política first-touch; destinos de anuncio y estado por repo.",
+    "1.0.0: primera versión."
+  ],
+  "versionado": "valor nuevo o campaña nueva = minor; cambio de significado de una regla = major.",
+  "propiedades_hubspot": {
+    "fuente_del_lead": {
+      "pregunta": "¿El lead vino de un clic pagado o no?",
+      "valores_que_emiten_las_landings": ["Ads", "Orgánico"],
+      "valores_existentes_no_emitidos_por_landings": ["Referido", "MetaRecsa", "Outbound/Piloto BBDD"],
+      "nota": "No se agregan opciones. 'Google Ads' y 'Meta Ads' NO existen en HubSpot y no deben enviarse."
+    },
+    "origen": {
+      "pregunta": "¿Qué plataforma?",
+      "valores_que_emiten_las_landings": ["Google", "Meta", "LinkedIn", "Orgánico"],
+      "valores_existentes_no_emitidos_por_landings": ["PR", "Outbound"],
+      "nota": "Para pago de plataforma desconocida (R4) se deja vacío."
+    },
+    "origen_detalle": {
+      "pregunta": "¿Qué campaña exacta?",
+      "estado": "propiedad nueva, a crear en HubSpot con aprobación (task #403)",
+      "tipo": "enumeration (select)",
+      "valores": [
+        { "value": "google_search_plataforma", "label": "Google Ads | Plataforma" },
+        { "value": "google_search_recupera", "label": "Google Ads | Recupera" },
+        { "value": "google_search_opera", "label": "Google Ads | Opera" },
+        { "value": "google_pmax_formularios", "label": "Google Ads | PMax Formularios" },
+        { "value": "google_sin_utm", "label": "Google Ads | Sin campaña en la URL" },
+        { "value": "google_campana_desconocida", "label": "Google Ads | Campaña no registrada" },
+        { "value": "meta_sin_detalle", "label": "Meta Ads | Sin detalle" },
+        { "value": "linkedin_sin_detalle", "label": "LinkedIn Ads | Sin detalle" },
+        { "value": "pagado_otra_plataforma", "label": "Pagado | Otra plataforma" },
+        { "value": "organico_directo", "label": "Orgánico / Directo" }
+      ]
+    }
+  },
+  "google_ads": {
+    "cuenta": "8584815343",
+    "autotagging": true,
+    "clave": "id numérico de campaña (estable ante renombres). Llega en utm_campaign mediante {campaignid}.",
+    "campanias": [
+      { "id": "23588970667", "nombre": "CL | Search | Leads | Plataforma", "origen_detalle": "google_search_plataforma", "estado": "ENABLED" },
+      { "id": "23584417865", "nombre": "CL | Search | Leads | Recupera", "origen_detalle": "google_search_recupera", "estado": "ENABLED" },
+      { "id": "24170007327", "nombre": "CL | Search | Leads | Opera", "origen_detalle": "google_search_opera", "estado": "ENABLED" },
+      { "id": "23580674078", "nombre": "Conversion Formularios WEB y GOOGLE", "origen_detalle": "google_pmax_formularios", "estado": "PAUSED" }
+    ],
+    "sufijo_url_final": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}",
+    "nivel_recomendado": "cuenta (customer.final_url_suffix): cubre campañas actuales y futuras. Piloto previo en una campaña.",
+    "reversion": "vaciar el campo del sufijo; no queda otro estado que deshacer.",
+    "campania_nueva_no_listada": "origen_detalle = google_campana_desconocida, se conserva el id crudo en utm_campaign y se emite una alerta. El lead nunca se pierde.",
+    "snapshot": "Leído en vivo el 2026-10-02: 4 campañas, sin plantilla de seguimiento ni sufijo de URL final en ningún nivel."
+  },
+  "normalizacion": {
+    "aplica_a": ["utm_source", "utm_medium", "utm_campaign"],
+    "pasos": ["trim", "minúsculas", "reemplazar '-' y espacios por '_'"],
+    "utm_medium_pagado": ["cpc", "ppc", "paid", "paidsearch", "paid_search", "paid_social", "paidsocial", "cpm", "display", "cpv"],
+    "orden_de_evaluacion": "primero utm_source, después utm_medium (evita que 'paid' de 'paid_social' mezcle plataformas)."
+  },
+  "reglas_de_asignacion": {
+    "orden": "Se evalúan en orden; gana la primera que coincide. Si llegan gclid y fbclid, gana R1.",
+    "reglas": [
+      {
+        "id": "R1",
+        "cuando": "gclid, gbraid o wbraid presente; o (utm_source = google y utm_medium en utm_medium_pagado)",
+        "entonces": { "fuente_del_lead": "Ads", "origen": "Google", "origen_detalle": "según utm_campaign (id) en google_ads.campanias; sin utm_campaign: google_sin_utm; id no listado: google_campana_desconocida" }
+      },
+      {
+        "id": "R2",
+        "cuando": "fbclid presente; o (utm_source en facebook|instagram|meta|fb|ig y utm_medium en utm_medium_pagado)",
+        "entonces": { "fuente_del_lead": "Ads", "origen": "Meta", "origen_detalle": "meta_sin_detalle" }
+      },
+      {
+        "id": "R3",
+        "cuando": "utm_source = linkedin y utm_medium en utm_medium_pagado",
+        "entonces": { "fuente_del_lead": "Ads", "origen": "LinkedIn", "origen_detalle": "linkedin_sin_detalle" }
+      },
+      {
+        "id": "R4",
+        "cuando": "utm_medium en utm_medium_pagado con cualquier otra plataforma (bing, tiktok, etc.)",
+        "entonces": { "fuente_del_lead": "Ads", "origen": "(vacío)", "origen_detalle": "pagado_otra_plataforma", "alerta": true }
+      },
+      {
+        "id": "R5",
+        "cuando": "cualquier otro caso (UTM no pagado, email, sin señales)",
+        "entonces": { "fuente_del_lead": "Orgánico", "origen": "Orgánico", "origen_detalle": "organico_directo" }
+      }
+    ]
+  },
+  "casos_de_prueba": [
+    { "n": 1, "entrada": { "gclid": "x", "utm_campaign": "23588970667" }, "salida": ["Ads", "Google", "google_search_plataforma"] },
+    { "n": 2, "entrada": { "gbraid": "x", "utm_campaign": "23584417865" }, "salida": ["Ads", "Google", "google_search_recupera"] },
+    { "n": 3, "entrada": { "wbraid": "x" }, "salida": ["Ads", "Google", "google_sin_utm"] },
+    { "n": 4, "entrada": { "gclid": "x", "utm_campaign": "999" }, "salida": ["Ads", "Google", "google_campana_desconocida"] },
+    { "n": 5, "entrada": { "utm_source": "Google", "utm_medium": "CPC", "utm_campaign": "24170007327" }, "salida": ["Ads", "Google", "google_search_opera"] },
+    { "n": 6, "entrada": { "fbclid": "x" }, "salida": ["Ads", "Meta", "meta_sin_detalle"] },
+    { "n": 7, "entrada": { "gclid": "x", "fbclid": "x", "utm_campaign": "23588970667" }, "salida": ["Ads", "Google", "google_search_plataforma"] },
+    { "n": 8, "entrada": { "gclid": "x", "utm_source": "facebook", "utm_campaign": "23584417865" }, "salida": ["Ads", "Google", "google_search_recupera"] },
+    { "n": 9, "entrada": { "utm_source": " Instagram ", "utm_medium": "Paid-Social" }, "salida": ["Ads", "Meta", "meta_sin_detalle"] },
+    { "n": 10, "entrada": { "utm_source": "linkedin", "utm_medium": "cpc" }, "salida": ["Ads", "LinkedIn", "linkedin_sin_detalle"] },
+    { "n": 11, "entrada": { "utm_source": "bing", "utm_medium": "cpc" }, "salida": ["Ads", "", "pagado_otra_plataforma"] },
+    { "n": 12, "entrada": { "utm_source": "newsletter", "utm_medium": "email" }, "salida": ["Orgánico", "Orgánico", "organico_directo"] },
+    { "n": 13, "entrada": { "utm_source": "google", "utm_medium": "organic" }, "salida": ["Orgánico", "Orgánico", "organico_directo"] },
+    { "n": 14, "entrada": {}, "salida": ["Orgánico", "Orgánico", "organico_directo"] },
+    { "n": 15, "entrada": { "utm_source": "google", "utm_medium": "paid_search", "utm_campaign": "23588970667" }, "salida": ["Ads", "Google", "google_search_plataforma"] }
+  ],
+  "politica_contactos_existentes": {
+    "first_touch": "Al actualizar un contacto que ya existe, NO se sobrescriben fuente_del_lead, origen ni origen_detalle si ya tienen valor. Un lead sin señales (R5) nunca degrada a un contacto ya clasificado como pagado.",
+    "valores_heredados": "Referido, MetaRecsa y Outbound/Piloto BBDD nunca se pisan.",
+    "no_se_toca": [
+      "Contactos existentes en HubSpot con orígenes antiguos o migrados (bases de datos cargadas antes): se dejan como están, sin reclasificar.",
+      "Nombres de campañas de Meta, formularios nativos de Meta e integraciones existentes (Zapier, formularios Recupero_*, SaaS_*).",
+      "Los valores existentes de fuente_del_lead y origen en HubSpot: no se borran ni se renombran."
+    ]
+  },
+  "captura_en_el_cliente": {
+    "parametros": ["gclid", "gbraid", "wbraid", "fbclid", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"],
+    "persistencia": "Se guardan en sessionStorage en la primera visita (first-touch) para que sobrevivan a la navegación y a recargas sin query.",
+    "landingPage": "origin + pathname, sin query (los parámetros viajan por separado)."
+  },
+  "regla_de_fallo": "Un valor de clasificación inválido nunca debe costar el lead: ante INVALID_OPTION o PROPERTY_DOESNT_EXIST se reintenta sin las propiedades de clasificación (incluida origen_detalle) y se alerta.",
+  "orden_de_despliegue": [
+    "1. Crear origen_detalle en HubSpot (con aprobación).",
+    "2. Desplegar el código de cada landing (captura, función única de clasificación, retry ampliado, first-touch).",
+    "3. Piloto: sufijo de URL final en una campaña de Google Ads y verificar con un clic real.",
+    "4. Sufijo a nivel de cuenta.",
+    "5. Test de contrato en cron."
+  ],
+  "destinos_anuncio": [
+    { "url": "https://www.somossena.com/plataforma", "repo": "sena-landing", "ruta": "/api/lead", "producto": "Plataforma" },
+    { "url": "https://www.somossena.com/recupera", "repo": "sena-landing", "ruta": "/api/lead", "producto": "Recupera" },
+    { "url": "https://www.somossena.com/opera", "repo": "sena-landing", "ruta": "/api/lead", "producto": "Opera" },
+    { "url": "https://somossena.com (analizador de cartera)", "repo": "sena-landing", "ruta": "/api/lead-analyzer" },
+    { "url": "https://recupera.somossena.com", "repo": "recupera-landing", "ruta": "/api/lead", "lista_hubspot": "363", "interes_del_producto": "Recupero Plus" },
+    { "url": "https://agente.somossena.com", "repo": "agent-project-landing", "ruta": "/api/lead", "lista_hubspot": "364", "interes_del_producto": "Opera" }
+  ],
+  "consumidores": [
+    { "repo": "sena-landing", "ruta": "/api/lead", "conforme": false, "pendiente": "captura con persistencia, gbraid/wbraid/utm_medium, función única, origen_detalle, first-touch" },
+    { "repo": "sena-landing", "ruta": "/api/lead-analyzer", "conforme": false, "pendiente": "valores inválidos de fuente_del_lead, tipo_de_origen inexistente, propiedades inexistentes, sin retry" },
+    { "repo": "recupera-landing", "ruta": "/api/lead", "conforme": false, "pendiente": "valores inválidos de fuente_del_lead, sin retry" },
+    { "repo": "agent-project-landing", "ruta": "/api/lead", "conforme": false, "pendiente": "no usa gclid ni fbclid; landingPage solo con pathname" },
+    { "repo": "sena-messaging", "ruta": "n/a", "conforme": null, "pendiente": "hoy no escribe atribución; alcance del work-item de WhatsApp Ads" }
+  ]
+}
