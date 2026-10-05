@@ -18,6 +18,25 @@ const headers = (token: string) => ({
   Authorization: `Bearer ${token}`,
 })
 
+// Propiedades que, si el contacto ya las tiene, NO se sobrescriben al reenviar un formulario:
+// propietario y etapa (trabajo comercial en curso) y la atribución original (first-touch).
+export const PRESERVE_IF_SET = [
+  'hubspot_owner_id',
+  'etapa_del_lead',
+  'fuente_del_lead',
+  'origen',
+  'origen_detalle',
+  'tipo_de_origen',
+  // Datos de contacto y prioridad: cualquiera que conozca un email podría pisarlos sin autenticarse.
+  // La información nueva del formulario queda en el negocio y en sena_contexto.
+  'firstname',
+  'lastname',
+  'phone',
+  'company',
+  'sena_prioridad',
+  'sena_intencion',
+]
+
 export type ExistingContact = { id: string; properties: Record<string, string | null> }
 
 export async function findContact(token: string, email: string): Promise<ExistingContact | null> {
@@ -27,7 +46,7 @@ export async function findContact(token: string, email: string): Promise<Existin
       headers: headers(token),
       body: JSON.stringify({
         filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],
-        properties: ['email'],
+        properties: ['email', ...PRESERVE_IF_SET],
         limit: 1,
       }),
     })
@@ -131,7 +150,13 @@ export async function upsertContact(
   const existing = await findContact(token, properties.email)
 
   if (existing) {
-    const res = await writeContact(token, 'PATCH', `/crm/v3/objects/contacts/${existing.id}`, properties)
+    // first-touch: lo que el contacto ya tiene (propietario, etapa, atribución) no se pisa
+    const toWrite = Object.fromEntries(
+      Object.entries(properties).filter(
+        ([key]) => !(PRESERVE_IF_SET.includes(key) && existing.properties[key])
+      )
+    )
+    const res = await writeContact(token, 'PATCH', `/crm/v3/objects/contacts/${existing.id}`, toWrite)
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
       throw new Error(`PATCH contact failed: ${describeHubspotError(res.status, err)}`)
@@ -146,7 +171,10 @@ export async function upsertContact(
     // ("Existing ID: 123"): se actualiza ese contacto en vez de perder el lead.
     const existingId = res.status === 409 ? /Existing ID:\s*(\d+)/.exec(JSON.stringify(err))?.[1] : undefined
     if (existingId) {
-      const patch = await writeContact(token, 'PATCH', `/crm/v3/objects/contacts/${existingId}`, properties)
+      const safe = Object.fromEntries(
+        Object.entries(properties).filter(([key]) => !PRESERVE_IF_SET.includes(key))
+      )
+      const patch = await writeContact(token, 'PATCH', `/crm/v3/objects/contacts/${existingId}`, safe)
       if (patch.ok) return { id: existingId, isNew: false }
     }
     throw new Error(`POST contact failed: ${describeHubspotError(res.status, err)}`)
@@ -155,11 +183,43 @@ export async function upsertContact(
   return { id: data.id, isNew: true }
 }
 
+// ¿El contacto ya tiene un negocio abierto con este nombre? Si la búsqueda falla se asume que no
+// (es preferible un negocio repetido a perder el seguimiento).
+async function hasOpenDeal(token: string, contactId: string, dealname: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${HS_API}/crm/v3/objects/deals/search`, {
+      method: 'POST',
+      headers: headers(token),
+      body: JSON.stringify({
+        filterGroups: [
+          {
+            filters: [
+              { propertyName: 'dealname', operator: 'EQ', value: dealname },
+              { propertyName: 'associations.contact', operator: 'EQ', value: contactId },
+              { propertyName: 'dealstage', operator: 'NEQ', value: 'closedwon' },
+              { propertyName: 'dealstage', operator: 'NEQ', value: 'closedlost' },
+            ],
+          },
+        ],
+        limit: 1,
+      }),
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    return data.total > 0
+  } catch {
+    return false
+  }
+}
+
 export async function createDeal(
   token: string,
   contactId: string,
-  deal: { dealname: string; description: string }
+  deal: { dealname: string; description: string },
+  dedupe = false
 ): Promise<void> {
+  if (dedupe && (await hasOpenDeal(token, contactId, deal.dealname))) return
+
   const res = await fetch(`${HS_API}/crm/v3/objects/deals`, {
     method: 'POST',
     headers: headers(token),

@@ -191,7 +191,7 @@ test.describe('robustez del guardado de contactos', () => {
     }
   })
 
-  test('un 409 de contacto existente se resuelve actualizando ese contacto', async () => {
+  test('un 409 de contacto existente se resuelve actualizando ese contacto sin pisar lo que ya tiene', async () => {
     const m = mockFetch([
       { status: 200, json: { total: 0, results: [] } },
       { status: 409, json: { status: 'error', message: 'Contact already exists. Existing ID: 4321', category: 'CONFLICT' } },
@@ -203,6 +203,10 @@ test.describe('robustez del guardado de contactos', () => {
       const patch = m.calls[2]
       expect(patch.method).toBe('PATCH')
       expect(patch.url).toContain('/contacts/4321')
+      for (const k of ['hubspot_owner_id', 'origen', 'origen_detalle', 'fuente_del_lead', 'phone', 'firstname', 'company']) {
+        expect(patch.body.properties).not.toHaveProperty(k)
+      }
+      expect(patch.body.properties.gclid).toBe('abc')
     } finally {
       m.restore()
     }
@@ -231,6 +235,41 @@ test.describe('robustez del guardado de contactos', () => {
       expect(r).toEqual({ id: '10', isNew: false })
       expect(m.calls.map((c) => c.method)).toEqual(['POST', 'POST', 'PATCH'])
       expect(m.calls.some((c) => c.url.endsWith('/crm/v3/objects/contacts'))).toBe(false)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('no pisa nombre, teléfono, empresa ni prioridad de un contacto existente', async () => {
+    const m = mockFetch([
+      {
+        status: 200,
+        json: {
+          total: 1,
+          results: [
+            {
+              id: '11',
+              properties: {
+                firstname: 'Pedro',
+                lastname: 'Soto',
+                phone: '+56900000000',
+                company: 'Cliente SpA',
+                sena_prioridad: 'A',
+                sena_intencion: 'Alta',
+              },
+            },
+          ],
+        },
+      },
+      { status: 200, json: { id: '11' } },
+    ])
+    try {
+      await upsertContact('tok', { ...props, sena_prioridad: 'C', sena_intencion: 'Baja' })
+      const patch = m.calls[1].body.properties
+      for (const k of ['firstname', 'lastname', 'phone', 'company', 'sena_prioridad', 'sena_intencion']) {
+        expect(patch).not.toHaveProperty(k)
+      }
+      expect(patch.gclid).toBe('abc')
     } finally {
       m.restore()
     }
