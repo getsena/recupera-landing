@@ -7,6 +7,7 @@ import {
   rememberLeadEventId,
 } from '@/lib/lead/clientAttribution'
 import { usePostContactForm } from '@/lib/services/contactService'
+import { submitLead } from '@/lib/lead/submit'
 import { useCountries } from '@/lib/services/countryService'
 import { useCurrencyStore } from '@/lib/store/useCurrencyStore'
 import { useToastStore } from '@/lib/store/useToastStore'
@@ -37,7 +38,7 @@ type FormData = {
 }
 
 export const ContactForm = () => {
-  const { postContactFormMutate } = usePostContactForm()
+  const { postContactFormAsync } = usePostContactForm()
   const [isSubmittingLead, setIsSubmittingLead] = useState(false)
   const { data: countries = [] } = useCountries()
   const { ipCurrency } = useCurrencyStore()
@@ -109,40 +110,6 @@ export const ContactForm = () => {
     const eventId = newEventId()
     rememberLeadEventId(eventId)
 
-    let hubspotOk = false
-    try {
-      const res = await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: data.nombre,
-          apellido: data.apellido,
-          empresa: data.empresa,
-          email: data.email,
-          telefono: telefonoConPrefijo,
-          facturas_pendientes: data.facturas_pendientes,
-          alguien_cobrando: data.alguien_cobrando,
-          ...atribucion,
-          landingPage: landingPageUrl(),
-          eventId,
-        }),
-      })
-      const json = await res.json().catch(() => ({ ok: false }))
-      hubspotOk = res.ok && json.ok
-    } catch {
-      hubspotOk = false
-    }
-
-    if (!hubspotOk) {
-      setIsSubmittingLead(false)
-      showToast({
-        iconType: 'error',
-        message: 'Error al enviar el formulario',
-        subMessage: 'Por favor, intenta de nuevo.',
-      })
-      return
-    }
-
     const contactPayload: ContactFormRequest = {
       nombre: data.nombre,
       apellido: data.apellido,
@@ -159,18 +126,52 @@ export const ContactForm = () => {
       utmCampaign: atribucion.utmCampaign,
       utmContent: atribucion.utmContent,
     }
-    postContactFormMutate(contactPayload, {
-      onSettled: () => {
-        setIsSubmittingLead(false)
-        showToast({
-          iconType: 'success',
-          message: 'Formulario enviado correctamente',
-          subMessage: 'Gracias, pronto nos pondremos en contacto contigo.',
+
+    // El lead se guarda en HubSpot y en el backend: basta con que uno lo reciba para no perderlo.
+    const result = await submitLead({
+      saveCrm: async () => {
+        const res = await fetch('/api/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: data.nombre,
+            apellido: data.apellido,
+            empresa: data.empresa,
+            email: data.email,
+            telefono: telefonoConPrefijo,
+            facturas_pendientes: data.facturas_pendientes,
+            alguien_cobrando: data.alguien_cobrando,
+            ...atribucion,
+            landingPage: landingPageUrl(),
+            eventId,
+          }),
         })
-        reset()
-        router.push('/thankyou')
+        const json = await res.json().catch(() => ({ ok: false }))
+        return res.ok && json.ok === true
+      },
+      saveBackend: async () => {
+        await postContactFormAsync(contactPayload)
+        return true
       },
     })
+
+    setIsSubmittingLead(false)
+    if (!result.ok) {
+      showToast({
+        iconType: 'error',
+        message: 'Error al enviar el formulario',
+        subMessage: 'Por favor, intenta de nuevo.',
+      })
+      return
+    }
+
+    showToast({
+      iconType: 'success',
+      message: 'Formulario enviado correctamente',
+      subMessage: 'Gracias, pronto nos pondremos en contacto contigo.',
+    })
+    reset()
+    router.push('/thankyou')
   }
 
   return (
