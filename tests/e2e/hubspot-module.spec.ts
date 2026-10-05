@@ -156,3 +156,83 @@ test.describe('los errores de HubSpot no exponen datos personales', () => {
     }
   })
 })
+
+test.describe('robustez del guardado de contactos', () => {
+  const props = {
+    email: 'ana@acme.cl',
+    firstname: 'Ana',
+    lastname: 'Pérez',
+    phone: '+56911112222',
+    company: 'Acme',
+    hubspot_owner_id: '89319447',
+    origen: 'Google',
+    origen_detalle: 'google_search_plataforma',
+    fuente_del_lead: 'Ads',
+    gclid: 'abc',
+    landing_page: 'https://www.recupera.somossena.com',
+    sena_contexto: 'x',
+  }
+
+  test('si el reintento también falla por una propiedad que no es de clasificación, guarda solo los campos núcleo', async () => {
+    const m = mockFetch([
+      { status: 400, json: { errors: [{ code: 'INVALID_OPTION' }] } },
+      { status: 400, json: { message: 'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"landing_page"}]' } },
+      { status: 201, json: { id: '9' } },
+    ])
+    try {
+      const res = await writeContact('tok', 'POST', '/crm/v3/objects/contacts', props)
+      expect(res.ok).toBe(true)
+      expect(m.calls).toHaveLength(3)
+      expect(Object.keys(m.calls[2].body.properties).sort()).toEqual(
+        ['company', 'email', 'firstname', 'hubspot_owner_id', 'lastname', 'phone']
+      )
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('un 409 de contacto existente se resuelve actualizando ese contacto', async () => {
+    const m = mockFetch([
+      { status: 200, json: { total: 0, results: [] } },
+      { status: 409, json: { status: 'error', message: 'Contact already exists. Existing ID: 4321', category: 'CONFLICT' } },
+      { status: 200, json: { id: '4321' } },
+    ])
+    try {
+      const r = await upsertContact('tok', props)
+      expect(r).toEqual({ id: '4321', isNew: false })
+      const patch = m.calls[2]
+      expect(patch.method).toBe('PATCH')
+      expect(patch.url).toContain('/contacts/4321')
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('un 409 sin id reconocible falla sin inventar un contacto', async () => {
+    const m = mockFetch([
+      { status: 200, json: { total: 0, results: [] } },
+      { status: 409, json: { message: 'conflict' } },
+    ])
+    try {
+      await expect(upsertContact('tok', props)).rejects.toThrow(/POST contact failed: status=409/)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('una búsqueda que falla con 429 se reintenta antes de asumir que el contacto es nuevo', async () => {
+    const m = mockFetch([
+      { status: 429, json: { message: 'rate limit' } },
+      { status: 200, json: { total: 1, results: [{ id: '10', properties: {} }] } },
+      { status: 200, json: { id: '10' } },
+    ])
+    try {
+      const r = await upsertContact('tok', props)
+      expect(r).toEqual({ id: '10', isNew: false })
+      expect(m.calls.map((c) => c.method)).toEqual(['POST', 'POST', 'PATCH'])
+      expect(m.calls.some((c) => c.url.endsWith('/crm/v3/objects/contacts'))).toBe(false)
+    } finally {
+      m.restore()
+    }
+  })
+})

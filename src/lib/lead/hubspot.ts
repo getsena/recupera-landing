@@ -21,15 +21,22 @@ const headers = (token: string) => ({
 export type ExistingContact = { id: string; properties: Record<string, string | null> }
 
 export async function findContact(token: string, email: string): Promise<ExistingContact | null> {
-  const res = await fetch(`${HS_API}/crm/v3/objects/contacts/search`, {
-    method: 'POST',
-    headers: headers(token),
-    body: JSON.stringify({
-      filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],
-      properties: ['email'],
-      limit: 1,
-    }),
-  })
+  const search = () =>
+    fetch(`${HS_API}/crm/v3/objects/contacts/search`, {
+      method: 'POST',
+      headers: headers(token),
+      body: JSON.stringify({
+        filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],
+        properties: ['email'],
+        limit: 1,
+      }),
+    })
+  let res = await search()
+  // 429 o 5xx no significan "contacto nuevo": se reintenta una vez antes de asumirlo
+  if (res.status === 429 || res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 400))
+    res = await search()
+  }
   if (!res.ok) return null
   const data = await res.json()
   return data.total > 0 ? { id: data.results[0].id, properties: data.results[0].properties ?? {} } : null
@@ -50,6 +57,9 @@ export const CLASSIFICATION_PROPS = [
   'facturas_pendientes',
   'alguien_cobrando',
 ]
+
+// Campos mínimos con los que un contacto siempre se puede guardar.
+const CORE_PROPS = ['email', 'firstname', 'lastname', 'phone', 'company', 'hubspot_owner_id']
 
 const RECOVERABLE_ERRORS = /INVALID_OPTION|PROPERTY_DOESNT_EXIST/
 
@@ -97,7 +107,21 @@ export async function writeContact(
   console.error(
     `[HubSpot] propiedad de clasificación rechazada, reintentando sin ellas: ${describeHubspotError(res.status, err)}`
   )
-  return send(safe)
+  const retry = await send(safe)
+  if (retry.ok) return retry
+
+  // Si también falla por una propiedad que no es de clasificación (gclid, landing_page, utm...),
+  // último intento solo con los campos núcleo: el contacto se guarda antes que perderlo.
+  const err2 = await retry
+    .clone()
+    .json()
+    .catch(() => ({}))
+  if (!RECOVERABLE_ERRORS.test(JSON.stringify(err2))) return retry
+  const core = Object.fromEntries(Object.entries(properties).filter(([key]) => CORE_PROPS.includes(key)))
+  console.error(
+    `[HubSpot] el reintento también fue rechazado, guardando solo campos núcleo: ${describeHubspotError(retry.status, err2)}`
+  )
+  return send(core)
 }
 
 export async function upsertContact(
@@ -118,6 +142,13 @@ export async function upsertContact(
   const res = await writeContact(token, 'POST', '/crm/v3/objects/contacts', properties)
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
+    // 409: el contacto ya existe (búsqueda caída o doble envío simultáneo). HubSpot indica su id
+    // ("Existing ID: 123"): se actualiza ese contacto en vez de perder el lead.
+    const existingId = res.status === 409 ? /Existing ID:\s*(\d+)/.exec(JSON.stringify(err))?.[1] : undefined
+    if (existingId) {
+      const patch = await writeContact(token, 'PATCH', `/crm/v3/objects/contacts/${existingId}`, properties)
+      if (patch.ok) return { id: existingId, isNew: false }
+    }
     throw new Error(`POST contact failed: ${describeHubspotError(res.status, err)}`)
   }
   const data = await res.json()
