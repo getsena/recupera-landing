@@ -62,7 +62,8 @@ test.describe('writeContact: un campo de clasificación nunca cuesta el lead', (
         status: 400,
         json: {
           status: 'error',
-          message: 'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"origen_detalle"}]',
+          message:
+            'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"origen_detalle"}]',
         },
       },
       { status: 200, json: { id: '3' } },
@@ -142,7 +143,10 @@ test.describe('los errores de HubSpot no exponen datos personales', () => {
     const original = console.error
     console.error = (...args: unknown[]) => void logs.push(args.join(' '))
     const m = mockFetch([
-      { status: 400, json: { ...errorConPII, errors: [{ code: 'INVALID_OPTION', context: { propertyName: ['origen'] } }] } },
+      {
+        status: 400,
+        json: { ...errorConPII, errors: [{ code: 'INVALID_OPTION', context: { propertyName: ['origen'] } }] },
+      },
       { status: 200, json: { id: '1' } },
     ])
     try {
@@ -176,16 +180,27 @@ test.describe('robustez del guardado de contactos', () => {
   test('si el reintento también falla por una propiedad que no es de clasificación, guarda solo los campos núcleo', async () => {
     const m = mockFetch([
       { status: 400, json: { errors: [{ code: 'INVALID_OPTION' }] } },
-      { status: 400, json: { message: 'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"landing_page"}]' } },
+      {
+        status: 400,
+        json: {
+          message:
+            'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"landing_page"}]',
+        },
+      },
       { status: 201, json: { id: '9' } },
     ])
     try {
       const res = await writeContact('tok', 'POST', '/crm/v3/objects/contacts', props)
       expect(res.ok).toBe(true)
       expect(m.calls).toHaveLength(3)
-      expect(Object.keys(m.calls[2].body.properties).sort()).toEqual(
-        ['company', 'email', 'firstname', 'hubspot_owner_id', 'lastname', 'phone']
-      )
+      expect(Object.keys(m.calls[2].body.properties).sort()).toEqual([
+        'company',
+        'email',
+        'firstname',
+        'hubspot_owner_id',
+        'lastname',
+        'phone',
+      ])
     } finally {
       m.restore()
     }
@@ -194,7 +209,10 @@ test.describe('robustez del guardado de contactos', () => {
   test('un 409 de contacto existente se resuelve actualizando ese contacto sin pisar lo que ya tiene', async () => {
     const m = mockFetch([
       { status: 200, json: { total: 0, results: [] } },
-      { status: 409, json: { status: 'error', message: 'Contact already exists. Existing ID: 4321', category: 'CONFLICT' } },
+      {
+        status: 409,
+        json: { status: 'error', message: 'Contact already exists. Existing ID: 4321', category: 'CONFLICT' },
+      },
       { status: 200, json: { id: '4321' } },
     ])
     try {
@@ -203,7 +221,15 @@ test.describe('robustez del guardado de contactos', () => {
       const patch = m.calls[2]
       expect(patch.method).toBe('PATCH')
       expect(patch.url).toContain('/contacts/4321')
-      for (const k of ['hubspot_owner_id', 'origen', 'origen_detalle', 'fuente_del_lead', 'phone', 'firstname', 'company']) {
+      for (const k of [
+        'hubspot_owner_id',
+        'origen',
+        'origen_detalle',
+        'fuente_del_lead',
+        'phone',
+        'firstname',
+        'company',
+      ]) {
         expect(patch.body.properties).not.toHaveProperty(k)
       }
       expect(patch.body.properties.gclid).toBe('abc')

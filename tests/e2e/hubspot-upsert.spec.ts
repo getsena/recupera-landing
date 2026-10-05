@@ -6,7 +6,10 @@ type Call = { method: string; url: string; body: Record<string, unknown> | undef
 
 // Simula HubSpot por ruta. `existing` es el contacto devuelto por la búsqueda por email;
 // `dealsFound` es el total que devuelve la búsqueda de negocios abiertos.
-function mockHubspot(opts: { existing?: { id: string; properties: Record<string, string | null> }; dealsFound?: number }) {
+function mockHubspot(opts: {
+  existing?: { id: string; properties: Record<string, string | null> }
+  dealsFound?: number
+}) {
   const calls: Call[] = []
   const original = globalThis.fetch
   globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
@@ -64,7 +67,14 @@ test.describe('upsertContact: contacto existente (first-touch)', () => {
       const r = await upsertContact('t', NEW_PROPS)
       expect(r).toEqual({ id: '10', isNew: false })
       const props = patchBody(m.calls)
-      for (const k of ['hubspot_owner_id', 'etapa_del_lead', 'fuente_del_lead', 'origen', 'origen_detalle', 'tipo_de_origen']) {
+      for (const k of [
+        'hubspot_owner_id',
+        'etapa_del_lead',
+        'fuente_del_lead',
+        'origen',
+        'origen_detalle',
+        'tipo_de_origen',
+      ]) {
         expect(props).not.toHaveProperty(k)
       }
       // lo demás sí se actualiza
@@ -77,7 +87,10 @@ test.describe('upsertContact: contacto existente (first-touch)', () => {
 
   test('completa los campos que el contacto tiene vacíos', async () => {
     const m = mockHubspot({
-      existing: { id: '11', properties: { hubspot_owner_id: '555', etapa_del_lead: null, fuente_del_lead: '' } },
+      existing: {
+        id: '11',
+        properties: { hubspot_owner_id: '555', etapa_del_lead: null, fuente_del_lead: '' },
+      },
     })
     try {
       await upsertContact('t', NEW_PROPS)

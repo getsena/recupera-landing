@@ -50,9 +50,7 @@ test.describe('el código coincide con la taxonomía', () => {
   })
 
   test('mismas campañas de Google Ads', () => {
-    const esperado = Object.fromEntries(
-      taxonomia.google_ads.campanias.map((c) => [c.id, c.origen_detalle])
-    )
+    const esperado = Object.fromEntries(taxonomia.google_ads.campanias.map((c) => [c.id, c.origen_detalle]))
     expect(GOOGLE_ADS_CAMPAIGNS).toEqual(esperado)
   })
 

@@ -170,7 +170,8 @@ test.describe('/api/lead: un campo de clasificación rechazado no pierde el lead
         {
           status: 400,
           json: {
-            message: 'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"origen_detalle"}]',
+            message:
+              'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"origen_detalle"}]',
           },
         },
         { status: 201, json: { id: '78' } },
