@@ -95,7 +95,7 @@ async function sendMetaCapi(body: LeadPayload, eventId: string): Promise<void> {
   if (body.fbclid) userData.fbc = `fb.1.${Date.now()}.${body.fbclid}`
 
   try {
-    await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -117,6 +117,8 @@ async function sendMetaCapi(body: LeadPayload, eventId: string): Promise<void> {
       }),
       signal: AbortSignal.timeout(2000),
     })
+    // Token vencido o pixel inválido: sin este log el fallo de Meta pasa inadvertido (sin PII)
+    if (!res.ok) console.error('[CAPI] status', res.status)
   } catch (err) {
     console.error('[CAPI] error:', err instanceof Error ? err.message : 'CAPI error')
   }
