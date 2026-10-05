@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { test, expect } from '@playwright/test'
 
 import { POST as postLead } from '@/app/api/lead/route'
+import { isSmokeTest } from '@/lib/lead/smoke'
 
 type Call = { method: string; url: string; body: unknown }
 
@@ -196,5 +197,106 @@ test.describe('/api/lead: un campo de clasificación rechazado no pierde el lead
     } finally {
       m.restore()
     }
+  })
+})
+
+const capiCalls = (calls: Call[]) => calls.filter((c) => c.url.includes('graph.facebook.com'))
+
+test.describe('Meta CAPI: solo se reporta lo que el CRM guardó', () => {
+  const payload = { ...leadPayload, fbclid: 'fb1' }
+
+  test.beforeEach(() => {
+    process.env.META_PIXEL_ID = 'pixel-1'
+    process.env.META_CAPI_TOKEN = 'capi-token'
+  })
+
+  test('envía el evento Lead con event_id después de guardar en HubSpot', async () => {
+    const m = mockHubspot()
+    try {
+      const res = await postLead(req({ ...payload, eventId: '123e4567-e89b-42d3-a456-426614174000' }))
+      expect(res.status).toBe(200)
+      const capi = capiCalls(m.calls)
+      expect(capi).toHaveLength(1)
+      const evento = (capi[0].body as { data: { event_id: string; event_name: string }[] }).data[0]
+      expect(evento.event_name).toBe('Lead')
+      expect(evento.event_id).toBe('123e4567-e89b-42d3-a456-426614174000')
+      // el evento sale después de crear el contacto, no antes
+      const iContacto = m.calls.findIndex(
+        (c) => c.method === 'POST' && c.url.endsWith('/crm/v3/objects/contacts')
+      )
+      expect(m.calls.indexOf(capi[0])).toBeGreaterThan(iContacto)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('genera un event_id si el cliente no manda uno', async () => {
+    const m = mockHubspot()
+    try {
+      await postLead(req(payload))
+      const evento = (capiCalls(m.calls)[0].body as { data: { event_id: string }[] }).data[0]
+      expect(evento.event_id).toMatch(/^[0-9a-f-]{36}$/)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('no reporta a Meta si HubSpot falla', async () => {
+    const m = mockHubspot({ contactPost: [{ status: 500, json: { message: 'boom' } }] })
+    try {
+      const res = await postLead(req(payload))
+      expect(res.status).toBe(502)
+      expect(capiCalls(m.calls)).toHaveLength(0)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('no reporta a Meta un payload inválido', async () => {
+    const m = mockHubspot()
+    try {
+      const res = await postLead(req({ ...payload, email: 'sin-arroba' }))
+      expect(res.status).toBe(400)
+      expect(capiCalls(m.calls)).toHaveLength(0)
+    } finally {
+      m.restore()
+    }
+  })
+})
+
+test.describe('smoke tests: los emails +smoke no se reportan a Meta', () => {
+  test.beforeEach(() => {
+    process.env.META_PIXEL_ID = 'pixel-1'
+    process.env.META_CAPI_TOKEN = 'capi-token'
+  })
+
+  test('guarda el lead pero no envía CAPI si el email lleva +smoke', async () => {
+    const m = mockHubspot()
+    try {
+      const res = await postLead(req({ ...leadPayload, email: 'smoke+123@somossena.com' }))
+      expect(res.status).toBe(200)
+      expect(contactWrites(m.calls)).toHaveLength(1)
+      expect(capiCalls(m.calls)).toHaveLength(0)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('un email normal sí se reporta a Meta', async () => {
+    const m = mockHubspot()
+    try {
+      await postLead(req({ ...leadPayload, email: 'ana+ventas@acme.cl' }))
+      expect(capiCalls(m.calls)).toHaveLength(1)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('isSmokeTest vale solo para el dominio propio', () => {
+    expect(isSmokeTest('smoke+1730000000@somossena.com')).toBe(true)
+    expect(isSmokeTest('ana+smoke@somossena.com')).toBe(true)
+    expect(isSmokeTest('smoke+1@gmail.com')).toBe(false)
+    expect(isSmokeTest('smoke+1@somossena.com.evil.cl')).toBe(false)
+    expect(isSmokeTest('ana+ventas@somossena.com')).toBe(false)
   })
 })

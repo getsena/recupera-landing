@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { classifyLead } from '@/lib/lead/classify'
@@ -10,6 +10,7 @@ import {
   getToken,
   upsertContact,
 } from '@/lib/lead/hubspot'
+import { isSmokeTest } from '@/lib/lead/smoke'
 import { readJsonBody, validateLead, type LeadPayload } from '@/lib/lead/validate'
 
 const INTERES_DEL_PRODUCTO = 'Recupero Plus'
@@ -81,7 +82,7 @@ function buildContactProperties(body: LeadPayload): Record<string, string> {
   return properties
 }
 
-async function sendMetaCapi(body: LeadPayload): Promise<void> {
+async function sendMetaCapi(body: LeadPayload, eventId: string): Promise<void> {
   const pixelId = process.env.META_PIXEL_ID
   const capiToken = process.env.META_CAPI_TOKEN
   if (!pixelId || !capiToken) return
@@ -102,6 +103,7 @@ async function sendMetaCapi(body: LeadPayload): Promise<void> {
         data: [
           {
             event_name: 'Lead',
+            event_id: eventId,
             event_time: Math.floor(Date.now() / 1000),
             action_source: 'website',
             user_data: userData,
@@ -113,7 +115,7 @@ async function sendMetaCapi(body: LeadPayload): Promise<void> {
           },
         ],
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2000),
     })
   } catch (err) {
     console.error('[CAPI] error:', err instanceof Error ? err.message : 'CAPI error')
@@ -134,8 +136,6 @@ export async function POST(req: NextRequest) {
   if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: validated.status })
   const body = validated.value
 
-  const capiPromise = sendMetaCapi(body)
-
   try {
     const { id: contactId, isNew } = await upsertContact(token, buildContactProperties(body))
     const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
@@ -151,11 +151,11 @@ export async function POST(req: NextRequest) {
       ),
       addToList(token, contactId, RECUPERA_LIST_ID),
     ])
-    await capiPromise
+    // Meta solo se entera de leads que el CRM sí guardó (evita conversiones fantasma)
+    if (!isSmokeTest(body.email)) await sendMetaCapi(body, body.eventId ?? randomUUID())
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[HubSpot] error:', err instanceof Error ? err.message : 'CRM error')
-    await capiPromise
     return NextResponse.json(
       { ok: false, error: 'No pudimos registrar tu solicitud. Intenta de nuevo.' },
       { status: 502 }
