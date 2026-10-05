@@ -2,6 +2,14 @@ import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { classifyLead } from '@/lib/lead/classify'
+import {
+  OWNER_FRANCISCO,
+  RECUPERA_LIST_ID,
+  addToList,
+  createDeal,
+  getToken,
+  upsertContact,
+} from '@/lib/lead/hubspot'
 
 type LeadPayload = {
   nombre: string
@@ -23,9 +31,6 @@ type LeadPayload = {
   landingPage?: string
 }
 
-const HS_API = 'https://api.hubapi.com'
-const OWNER_FRANCISCO = '89319447'
-const PRODUCT_LIST_ID = '363'
 const INTERES_DEL_PRODUCTO = 'Recupero Plus'
 
 function calcPrioridad(facturas: string, cobrando: string): 'A' | 'B' | 'C' {
@@ -52,28 +57,7 @@ function normalizeCobrando(value: string): string {
   return v
 }
 
-function getToken(): string {
-  const t = process.env.HUBSPOT_ACCESS_TOKEN
-  if (!t) throw new Error('HUBSPOT_ACCESS_TOKEN no configurado')
-  return t
-}
-
-async function findContactByEmail(token: string, email: string): Promise<string | null> {
-  const res = await fetch(`${HS_API}/crm/v3/objects/contacts/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],
-      properties: ['email'],
-      limit: 1,
-    }),
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return data.total > 0 ? data.results[0].id : null
-}
-
-async function upsertContact(token: string, body: LeadPayload): Promise<string> {
+function buildContactProperties(body: LeadPayload): Record<string, string> {
   const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
   const clasificacion = classifyLead({
     utmSource: body.utmSource,
@@ -113,82 +97,7 @@ async function upsertContact(token: string, body: LeadPayload): Promise<string> 
   if (body.utmCampaign) properties.utm_campaign = body.utmCampaign
   if (body.utmTerm) properties.utm_term = body.utmTerm
 
-  const existingId = await findContactByEmail(token, body.email)
-
-  if (existingId) {
-    const res = await fetch(`${HS_API}/crm/v3/objects/contacts/${existingId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ properties }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(`PATCH contact failed: ${JSON.stringify(err)}`)
-    }
-    return existingId
-  }
-
-  const res = await fetch(`${HS_API}/crm/v3/objects/contacts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ properties }),
-  })
-  if (res.status === 409) {
-    // Contact exists but findContactByEmail missed it (race/transient error) — recover the ID
-    const errData = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    const conflictId = (errData.id as string) || (errData.data as Record<string, string>)?.existingObjectId
-    if (conflictId) return conflictId
-    const fallback = await findContactByEmail(token, body.email)
-    if (fallback) return fallback
-    throw new Error(`POST contact 409 conflict, ID not recoverable`)
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`POST contact failed: ${JSON.stringify(err)}`)
-  }
-  const data = await res.json()
-  return data.id
-}
-
-async function createDeal(token: string, contactId: string, body: LeadPayload): Promise<void> {
-  const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
-
-  const res = await fetch(`${HS_API}/crm/v3/objects/deals`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      properties: {
-        dealname: `Recupera — ${body.empresa}`,
-        dealstage: 'appointmentscheduled',
-        pipeline: 'default',
-        hubspot_owner_id: OWNER_FRANCISCO,
-        closedate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        description: `Prioridad: ${prioridad} · Facturas: ${body.facturas_pendientes} · Cobrando: ${body.alguien_cobrando}`,
-      },
-    }),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`POST deal failed: ${JSON.stringify(err)}`)
-  }
-  const deal = await res.json()
-
-  await fetch(`${HS_API}/crm/v3/objects/deals/${deal.id}/associations/contacts/${contactId}/3`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-async function addToList(token: string, contactId: string): Promise<void> {
-  const res = await fetch(`${HS_API}/crm/v3/lists/${PRODUCT_LIST_ID}/memberships/add`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify([contactId]),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok || (data as { recordIdsMissing?: string[] }).recordIdsMissing?.length) {
-    throw new Error(`addToList failed for contact ${contactId}: ${JSON.stringify(data)}`)
-  }
+  return properties
 }
 
 async function sendMetaCapi(body: LeadPayload): Promise<void> {
@@ -258,8 +167,15 @@ export async function POST(req: NextRequest) {
   const capiPromise = sendMetaCapi(body)
 
   try {
-    const contactId = await upsertContact(token, body)
-    await Promise.all([createDeal(token, contactId, body), addToList(token, contactId)])
+    const { id: contactId } = await upsertContact(token, buildContactProperties(body))
+    const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
+    await Promise.all([
+      createDeal(token, contactId, {
+        dealname: `Recupera — ${body.empresa}`,
+        description: `Prioridad: ${prioridad} · Facturas: ${body.facturas_pendientes} · Cobrando: ${body.alguien_cobrando}`,
+      }),
+      addToList(token, contactId, RECUPERA_LIST_ID),
+    ])
     await capiPromise
     return NextResponse.json({ ok: true })
   } catch (err) {

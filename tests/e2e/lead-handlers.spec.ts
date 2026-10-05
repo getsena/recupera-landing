@@ -139,3 +139,61 @@ test.describe('/api/lead: fuente_del_lead válida', () => {
     }
   })
 })
+
+test.describe('/api/lead: un campo de clasificación rechazado no pierde el lead', () => {
+  const CLASIFICACION = ['origen', 'origen_detalle', 'fuente_del_lead', 'sena_prioridad', 'etapa_del_lead']
+
+  test('ante 400 INVALID_OPTION reintenta sin clasificación y responde ok', async () => {
+    const m = mockHubspot({
+      contactPost: [
+        { status: 400, json: { errors: [{ code: 'INVALID_OPTION', message: 'fuente_del_lead' }] } },
+        { status: 201, json: { id: '77' } },
+      ],
+    })
+    try {
+      const res = await postLead(req({ ...leadPayload, gclid: 'abc' }))
+      expect(res.status).toBe(200)
+      const writes = contactWrites(m.calls)
+      expect(writes).toHaveLength(2)
+      const reintento = propsOf(writes[1])
+      for (const k of CLASIFICACION) expect(reintento).not.toHaveProperty(k)
+      expect(reintento.email).toBe(leadPayload.email)
+      expect(reintento.firstname).toBe('Ana')
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('ante PROPERTY_DOESNT_EXIST también guarda el lead sin clasificación', async () => {
+    const m = mockHubspot({
+      contactPost: [
+        {
+          status: 400,
+          json: {
+            message: 'Property values were not valid: [{"error":"PROPERTY_DOESNT_EXIST","name":"origen_detalle"}]',
+          },
+        },
+        { status: 201, json: { id: '78' } },
+      ],
+    })
+    try {
+      const res = await postLead(req({ ...leadPayload, gclid: 'abc' }))
+      expect(res.status).toBe(200)
+      expect(contactWrites(m.calls)).toHaveLength(2)
+    } finally {
+      m.restore()
+    }
+  })
+
+  test('un error que no es de clasificación no se reintenta y responde 502', async () => {
+    const m = mockHubspot({ contactPost: [{ status: 500, json: { message: 'boom' } }] })
+    try {
+      const res = await postLead(req(leadPayload))
+      expect(res.status).toBe(502)
+      expect(await res.json()).toMatchObject({ ok: false })
+      expect(contactWrites(m.calls)).toHaveLength(1)
+    } finally {
+      m.restore()
+    }
+  })
+})
