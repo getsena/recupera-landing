@@ -9,6 +9,7 @@ type Call = { method: string; url: string; body: Record<string, unknown> | undef
 function mockHubspot(opts: {
   existing?: { id: string; properties: Record<string, string | null> }
   dealsFound?: number
+  associationStatus?: number
 }) {
   const calls: Call[] = []
   const original = globalThis.fetch
@@ -26,6 +27,9 @@ function mockHubspot(opts: {
     if (method === 'POST' && url.endsWith('/crm/v3/objects/contacts')) return json(201, { id: '500' })
     if (method === 'PATCH') return json(200, { id: opts.existing?.id ?? '0' })
     if (url.endsWith('/crm/v3/objects/deals')) return json(201, { id: '900' })
+    if (method === 'PUT' && url.includes('/associations/')) {
+      return json(opts.associationStatus ?? 200, opts.associationStatus ? { category: 'VALIDATION_ERROR' } : {})
+    }
     return json(200, {})
   }) as typeof fetch
   return { calls, restore: () => (globalThis.fetch = original) }
@@ -148,6 +152,36 @@ test.describe('createDeal: sin negocios duplicados', () => {
       await createDeal('t', '500', deal, false)
       expect(m.calls.some((c) => c.url.includes('/deals/search'))).toBe(false)
       expect(dealPosts(m.calls)).toHaveLength(1)
+    } finally {
+      m.restore()
+    }
+  })
+})
+
+test.describe('createDeal: falla de la asociación deal-contacto', () => {
+  test('propaga el fallo (502 en la ruta) y lo registra sin datos personales', async () => {
+    const m = mockHubspot({ associationStatus: 500 })
+    const logs: string[] = []
+    const originalError = console.error
+    console.error = (...a: unknown[]) => logs.push(a.join(' '))
+    try {
+      await expect(
+        createDeal('t', '10', { dealname: 'Recupera — Acme', description: 'x' }, false)
+      ).rejects.toThrow(/associate deal failed: status=500/)
+      expect(logs.join(' ')).toContain('status=500')
+      expect(logs.join(' ')).not.toContain('Acme')
+    } finally {
+      console.error = originalError
+      m.restore()
+    }
+  })
+
+  test('si la asociación responde bien no lanza', async () => {
+    const m = mockHubspot({})
+    try {
+      await expect(
+        createDeal('t', '10', { dealname: 'Recupera — Acme', description: 'x' }, false)
+      ).resolves.toBeUndefined()
     } finally {
       m.restore()
     }

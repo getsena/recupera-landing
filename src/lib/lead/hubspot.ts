@@ -240,10 +240,17 @@ export async function createDeal(
   }
   const created = await res.json()
 
-  await fetch(`${HS_API}/crm/v3/objects/deals/${created.id}/associations/contacts/${contactId}/3`, {
+  const assoc = await fetch(`${HS_API}/crm/v3/objects/deals/${created.id}/associations/contacts/${contactId}/3`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
   })
+  if (!assoc.ok) {
+    // Sin asociación el negocio queda huérfano: se propaga para que la ruta responda 502
+    const err = await assoc.json().catch(() => ({}))
+    const detail = describeHubspotError(assoc.status, err)
+    console.error(`[HubSpot] no se pudo asociar el negocio al contacto: ${detail}`)
+    throw new Error(`associate deal failed: ${detail}`)
+  }
 }
 
 export async function addToList(token: string, contactId: string, listId: string): Promise<void> {
