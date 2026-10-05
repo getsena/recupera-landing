@@ -1,38 +1,19 @@
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
-type LeadPayload = {
-  nombre: string
-  apellido: string
-  empresa: string
-  email: string
-  telefono: string
-  facturas_pendientes: string
-  alguien_cobrando: string
-  utmSource?: string
-  utmMedium?: string
-  utmCampaign?: string
-  utmContent?: string
-  utmTerm?: string
-  gclid?: string
-  fbclid?: string
-  landingPage?: string
-}
+import { classifyLead } from '@/lib/lead/classify'
+import {
+  OWNER_FRANCISCO,
+  RECUPERA_LIST_ID,
+  addToList,
+  createDeal,
+  getToken,
+  upsertContact,
+} from '@/lib/lead/hubspot'
+import { isSmokeTest } from '@/lib/lead/smoke'
+import { readJsonBody, validateLead, type LeadPayload } from '@/lib/lead/validate'
 
-const HS_API = 'https://api.hubapi.com'
-const OWNER_FRANCISCO = '89319447'
-const PRODUCT_LIST_ID = '363'
 const INTERES_DEL_PRODUCTO = 'Recupero Plus'
-
-function mapOrigen(utmSource?: string, gclid?: string, fbclid?: string): string {
-  if (gclid) return 'Google'
-  if (fbclid) return 'Meta'
-  const src = (utmSource ?? '').toLowerCase()
-  if (src === 'google' || src === 'cpc') return 'Google'
-  if (src === 'facebook' || src === 'meta' || src === 'fb') return 'Meta'
-  if (src === 'linkedin') return 'LinkedIn'
-  return 'Orgánico'
-}
 
 function calcPrioridad(facturas: string, cobrando: string): 'A' | 'B' | 'C' {
   let score = 0
@@ -58,31 +39,17 @@ function normalizeCobrando(value: string): string {
   return v
 }
 
-function getToken(): string {
-  const t = process.env.HUBSPOT_ACCESS_TOKEN
-  if (!t) throw new Error('HUBSPOT_ACCESS_TOKEN no configurado')
-  return t
-}
-
-async function findContactByEmail(token: string, email: string): Promise<string | null> {
-  const res = await fetch(`${HS_API}/crm/v3/objects/contacts/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],
-      properties: ['email'],
-      limit: 1,
-    }),
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return data.total > 0 ? data.results[0].id : null
-}
-
-async function upsertContact(token: string, body: LeadPayload): Promise<string> {
+function buildContactProperties(body: LeadPayload): Record<string, string> {
   const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
-  const origen = mapOrigen(body.utmSource, body.gclid, body.fbclid)
-  const fuente = body.gclid ? 'Google Ads' : body.fbclid ? 'Meta Ads' : body.utmSource ? 'Ads' : 'Orgánico'
+  const clasificacion = classifyLead({
+    utmSource: body.utmSource,
+    utmMedium: body.utmMedium,
+    utmCampaign: body.utmCampaign,
+    gclid: body.gclid,
+    gbraid: body.gbraid,
+    wbraid: body.wbraid,
+    fbclid: body.fbclid,
+  })
 
   const properties: Record<string, string> = {
     firstname: body.nombre,
@@ -94,14 +61,17 @@ async function upsertContact(token: string, body: LeadPayload): Promise<string> 
     interes_del_producto: INTERES_DEL_PRODUCTO,
     tipo_de_origen: 'Form landing',
     etapa_del_lead: 'Interesado',
-    origen,
-    fuente_del_lead: fuente,
+    fuente_del_lead: clasificacion.fuente,
+    origen_detalle: clasificacion.origenDetalle,
     sena_prioridad: prioridad,
     sena_intencion: calcSenaIntencion(prioridad),
     facturas_pendientes: body.facturas_pendientes,
     alguien_cobrando: normalizeCobrando(body.alguien_cobrando),
-    sena_contexto: `Lead landing Recupera. Facturas: ${body.facturas_pendientes}. Cobrando: ${body.alguien_cobrando}. Prioridad auto: ${prioridad}. Origen: ${origen}.`,
+    sena_contexto: `Lead landing Recupera. Facturas: ${body.facturas_pendientes}. Cobrando: ${body.alguien_cobrando}. Prioridad auto: ${prioridad}. Origen: ${clasificacion.origen || 'otro'}.`,
   }
+
+  // origen queda vacío para pagos de una plataforma desconocida (regla R4): no se envía.
+  if (clasificacion.origen) properties.origen = clasificacion.origen
 
   if (body.gclid) properties.gclid = body.gclid
   if (body.fbclid) properties.fbclid = body.fbclid
@@ -109,85 +79,10 @@ async function upsertContact(token: string, body: LeadPayload): Promise<string> 
   if (body.utmCampaign) properties.utm_campaign = body.utmCampaign
   if (body.utmTerm) properties.utm_term = body.utmTerm
 
-  const existingId = await findContactByEmail(token, body.email)
-
-  if (existingId) {
-    const res = await fetch(`${HS_API}/crm/v3/objects/contacts/${existingId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ properties }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(`PATCH contact failed: ${JSON.stringify(err)}`)
-    }
-    return existingId
-  }
-
-  const res = await fetch(`${HS_API}/crm/v3/objects/contacts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ properties }),
-  })
-  if (res.status === 409) {
-    // Contact exists but findContactByEmail missed it (race/transient error) — recover the ID
-    const errData = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    const conflictId = (errData.id as string) || (errData.data as Record<string, string>)?.existingObjectId
-    if (conflictId) return conflictId
-    const fallback = await findContactByEmail(token, body.email)
-    if (fallback) return fallback
-    throw new Error(`POST contact 409 conflict, ID not recoverable`)
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`POST contact failed: ${JSON.stringify(err)}`)
-  }
-  const data = await res.json()
-  return data.id
+  return properties
 }
 
-async function createDeal(token: string, contactId: string, body: LeadPayload): Promise<void> {
-  const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
-
-  const res = await fetch(`${HS_API}/crm/v3/objects/deals`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      properties: {
-        dealname: `Recupera — ${body.empresa}`,
-        dealstage: 'appointmentscheduled',
-        pipeline: 'default',
-        hubspot_owner_id: OWNER_FRANCISCO,
-        closedate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        description: `Prioridad: ${prioridad} · Facturas: ${body.facturas_pendientes} · Cobrando: ${body.alguien_cobrando}`,
-      },
-    }),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(`POST deal failed: ${JSON.stringify(err)}`)
-  }
-  const deal = await res.json()
-
-  await fetch(`${HS_API}/crm/v3/objects/deals/${deal.id}/associations/contacts/${contactId}/3`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-}
-
-async function addToList(token: string, contactId: string): Promise<void> {
-  const res = await fetch(`${HS_API}/crm/v3/lists/${PRODUCT_LIST_ID}/memberships/add`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify([contactId]),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok || (data as { recordIdsMissing?: string[] }).recordIdsMissing?.length) {
-    throw new Error(`addToList failed for contact ${contactId}: ${JSON.stringify(data)}`)
-  }
-}
-
-async function sendMetaCapi(body: LeadPayload): Promise<void> {
+async function sendMetaCapi(body: LeadPayload, eventId: string): Promise<void> {
   const pixelId = process.env.META_PIXEL_ID
   const capiToken = process.env.META_CAPI_TOKEN
   if (!pixelId || !capiToken) return
@@ -200,7 +95,7 @@ async function sendMetaCapi(body: LeadPayload): Promise<void> {
   if (body.fbclid) userData.fbc = `fb.1.${Date.now()}.${body.fbclid}`
 
   try {
-    await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -208,6 +103,7 @@ async function sendMetaCapi(body: LeadPayload): Promise<void> {
         data: [
           {
             event_name: 'Lead',
+            event_id: eventId,
             event_time: Math.floor(Date.now() / 1000),
             action_source: 'website',
             user_data: userData,
@@ -219,8 +115,10 @@ async function sendMetaCapi(body: LeadPayload): Promise<void> {
           },
         ],
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(2000),
     })
+    // Token vencido o pixel inválido: sin este log el fallo de Meta pasa inadvertido (sin PII)
+    if (!res.ok) console.error('[CAPI] status', res.status)
   } catch (err) {
     console.error('[CAPI] error:', err instanceof Error ? err.message : 'CAPI error')
   }
@@ -234,33 +132,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'HubSpot no configurado' }, { status: 500 })
   }
 
-  let body: LeadPayload
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
-  }
-
-  const { nombre, apellido, empresa, email, telefono, facturas_pendientes, alguien_cobrando } = body
-  if (!nombre || !apellido || !empresa || !email || !telefono || !facturas_pendientes || !alguien_cobrando) {
-    return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return NextResponse.json({ error: 'Email inválido' }, { status: 400 })
-  }
-
-  const capiPromise = sendMetaCapi(body)
+  const parsed = await readJsonBody(req)
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+  const validated = validateLead(parsed.value)
+  if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: validated.status })
+  const body = validated.value
 
   try {
-    const contactId = await upsertContact(token, body)
-    await Promise.all([createDeal(token, contactId, body), addToList(token, contactId)])
-    await capiPromise
+    const { id: contactId, isNew } = await upsertContact(token, buildContactProperties(body))
+    const prioridad = calcPrioridad(body.facturas_pendientes, body.alguien_cobrando)
+    await Promise.all([
+      createDeal(
+        token,
+        contactId,
+        {
+          dealname: `Recupera — ${body.empresa}`,
+          description: `Prioridad: ${prioridad} · Facturas: ${body.facturas_pendientes} · Cobrando: ${body.alguien_cobrando}`,
+        },
+        !isNew
+      ),
+      addToList(token, contactId, RECUPERA_LIST_ID),
+    ])
+    // Meta solo se entera de leads que el CRM sí guardó (evita conversiones fantasma)
+    if (!isSmokeTest(body.email)) await sendMetaCapi(body, body.eventId ?? randomUUID())
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[HubSpot] error:', err instanceof Error ? err.message : 'CRM error')
-    await capiPromise
     return NextResponse.json(
       { ok: false, error: 'No pudimos registrar tu solicitud. Intenta de nuevo.' },
       { status: 502 }

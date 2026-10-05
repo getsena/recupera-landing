@@ -1,5 +1,6 @@
 'use client'
 
+import { pixelEventOptions } from '@/lib/lead/clientAttribution'
 import { AssetImage } from '@/lib/utils/assets/image'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -30,7 +31,7 @@ export const ThankyouPage = () => {
       window.gtag('event', 'conversion', { send_to: 'AW-17962976949/sCCeCNfunKccELWNtfVC' })
     }
     if (window.fbq) {
-      window.fbq('track', 'Lead', { content_name: 'recupera' })
+      window.fbq('track', 'Lead', { content_name: 'recupera' }, ...pixelEventOptions())
     }
   }, [])
 

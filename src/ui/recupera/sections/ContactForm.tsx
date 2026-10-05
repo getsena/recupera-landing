@@ -1,6 +1,13 @@
 'use client'
 
+import {
+  getAttributionPayload,
+  landingPageUrl,
+  newEventId,
+  rememberLeadEventId,
+} from '@/lib/lead/clientAttribution'
 import { usePostContactForm } from '@/lib/services/contactService'
+import { SUBMIT_TIMEOUT_MS, submitLead } from '@/lib/lead/submit'
 import { useCountries } from '@/lib/services/countryService'
 import { useCurrencyStore } from '@/lib/store/useCurrencyStore'
 import { useToastStore } from '@/lib/store/useToastStore'
@@ -9,7 +16,7 @@ import Button from '@/ui/shared/Button'
 import { Input } from '@/ui/shared/Input'
 import SimpleCountrySelect, { OptionSelect } from '@/ui/shared/SimpleCountrySelect'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
@@ -31,22 +38,13 @@ type FormData = {
 }
 
 export const ContactForm = () => {
-  const { postContactFormMutate } = usePostContactForm()
+  const { postContactFormAsync } = usePostContactForm()
   const [isSubmittingLead, setIsSubmittingLead] = useState(false)
   const { data: countries = [] } = useCountries()
   const { ipCurrency } = useCurrencyStore()
   const { showToast } = useToastStore()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [countrySelect, setCountrySelect] = useState<string | null>(null)
-
-  const utmSource = searchParams?.get('utm_source') || null
-  const utmMedium = searchParams?.get('utm_medium') || null
-  const utmCampaign = searchParams?.get('utm_campaign') || null
-  const utmContent = searchParams?.get('utm_content') || null
-  const utmTerm = searchParams?.get('utm_term') || null
-  const [gclid, setGclid] = useState<string | null>(null)
-  const [fbclid, setFbclid] = useState<string | null>(null)
 
   const countryOptions = useMemo(() => {
     if (!countries.length) return []
@@ -83,20 +81,6 @@ export const ContactForm = () => {
     }
   }, [ipCurrency])
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const gc = params.get('gclid') || sessionStorage.getItem('gclid')
-    const fb = params.get('fbclid') || sessionStorage.getItem('fbclid')
-    if (gc) {
-      setGclid(gc)
-      sessionStorage.setItem('gclid', gc)
-    }
-    if (fb) {
-      setFbclid(fb)
-      sessionStorage.setItem('fbclid', fb)
-    }
-  }, [])
-
   const {
     control,
     handleSubmit,
@@ -120,44 +104,11 @@ export const ContactForm = () => {
 
     setIsSubmittingLead(true)
 
-    let hubspotOk = false
-    try {
-      const res = await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: data.nombre,
-          apellido: data.apellido,
-          empresa: data.empresa,
-          email: data.email,
-          telefono: telefonoConPrefijo,
-          facturas_pendientes: data.facturas_pendientes,
-          alguien_cobrando: data.alguien_cobrando,
-          utmSource: utmSource ?? undefined,
-          utmMedium: utmMedium ?? undefined,
-          utmCampaign: utmCampaign ?? undefined,
-          utmContent: utmContent ?? undefined,
-          utmTerm: utmTerm ?? undefined,
-          gclid: gclid ?? undefined,
-          fbclid: fbclid ?? undefined,
-          landingPage: window.location.href,
-        }),
-      })
-      const json = await res.json().catch(() => ({ ok: false }))
-      hubspotOk = res.ok && json.ok
-    } catch {
-      hubspotOk = false
-    }
-
-    if (!hubspotOk) {
-      setIsSubmittingLead(false)
-      showToast({
-        iconType: 'error',
-        message: 'Error al enviar el formulario',
-        subMessage: 'Por favor, intenta de nuevo.',
-      })
-      return
-    }
+    // first-touch: lo guardado en la sesión (gclid, gbraid, wbraid, fbclid, utm_*) más lo de la URL actual
+    const atribucion = getAttributionPayload()
+    // mismo id para el pixel de la página de gracias y Meta CAPI, para que Meta deduplique el Lead
+    const eventId = newEventId()
+    rememberLeadEventId(eventId)
 
     const contactPayload: ContactFormRequest = {
       nombre: data.nombre,
@@ -170,23 +121,58 @@ export const ContactForm = () => {
       nombreEmpresa: data.empresa,
       mensaje: '',
       howFound: '',
-      utmSource: utmSource || undefined,
-      utmMedium: utmMedium || undefined,
-      utmCampaign: utmCampaign || undefined,
-      utmContent: utmContent || undefined,
+      utmSource: atribucion.utmSource,
+      utmMedium: atribucion.utmMedium,
+      utmCampaign: atribucion.utmCampaign,
+      utmContent: atribucion.utmContent,
     }
-    postContactFormMutate(contactPayload, {
-      onSettled: () => {
-        setIsSubmittingLead(false)
-        showToast({
-          iconType: 'success',
-          message: 'Formulario enviado correctamente',
-          subMessage: 'Gracias, pronto nos pondremos en contacto contigo.',
+
+    // El lead se guarda en HubSpot y en el backend: basta con que uno lo reciba para no perderlo.
+    const result = await submitLead({
+      saveCrm: async () => {
+        const res = await fetch('/api/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: data.nombre,
+            apellido: data.apellido,
+            empresa: data.empresa,
+            email: data.email,
+            telefono: telefonoConPrefijo,
+            facturas_pendientes: data.facturas_pendientes,
+            alguien_cobrando: data.alguien_cobrando,
+            ...atribucion,
+            landingPage: landingPageUrl(),
+            eventId,
+          }),
+          signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
         })
-        reset()
-        router.push('/thankyou')
+        const json = await res.json().catch(() => ({ ok: false }))
+        return res.ok && json.ok === true
+      },
+      saveBackend: async () => {
+        await postContactFormAsync(contactPayload)
+        return true
       },
     })
+
+    setIsSubmittingLead(false)
+    if (!result.ok) {
+      showToast({
+        iconType: 'error',
+        message: 'Error al enviar el formulario',
+        subMessage: 'Por favor, intenta de nuevo.',
+      })
+      return
+    }
+
+    showToast({
+      iconType: 'success',
+      message: 'Formulario enviado correctamente',
+      subMessage: 'Gracias, pronto nos pondremos en contacto contigo.',
+    })
+    reset()
+    router.push('/thankyou')
   }
 
   return (

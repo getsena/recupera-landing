@@ -8,6 +8,7 @@ import { GoogleTagManager } from '@next/third-parties/google'
 import { Suspense } from 'react'
 import { adobeCleanFont, canaroFont, caslonFont } from './fonts'
 import './globals.css'
+import AttributionCapture from '@/ui/shared/AttributionCapture'
 import Providers from './providers'
 
 export const metadata: Metadata = {
@@ -149,6 +150,7 @@ export default async function RootLayout({
               })();
             `}
           </Script>
+          <AttributionCapture />
           <Suspense>{children}</Suspense>
           <ModalRenderer />
           <Toast />
