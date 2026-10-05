@@ -8,12 +8,17 @@ const postContactForm = async (data: ContactFormRequest) => {
 }
 
 export const usePostContactForm = () => {
-  const { mutate: postContactFormMutate, isPending: isLoadingPostContactForm } = useMutation({
+  const {
+    mutate: postContactFormMutate,
+    mutateAsync: postContactFormAsync,
+    isPending: isLoadingPostContactForm,
+  } = useMutation({
     mutationFn: (user: ContactFormRequest) => postContactForm(user),
   })
 
   return {
     postContactFormMutate,
+    postContactFormAsync,
     isLoadingPostContactForm,
   }
 }
