@@ -1,5 +1,11 @@
 'use client'
 
+import {
+  getAttributionPayload,
+  landingPageUrl,
+  newEventId,
+  rememberLeadEventId,
+} from '@/lib/lead/clientAttribution'
 import { usePostContactForm } from '@/lib/services/contactService'
 import { useCountries } from '@/lib/services/countryService'
 import { useCurrencyStore } from '@/lib/store/useCurrencyStore'
@@ -9,7 +15,7 @@ import Button from '@/ui/shared/Button'
 import { Input } from '@/ui/shared/Input'
 import SimpleCountrySelect, { OptionSelect } from '@/ui/shared/SimpleCountrySelect'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 
@@ -37,16 +43,7 @@ export const ContactForm = () => {
   const { ipCurrency } = useCurrencyStore()
   const { showToast } = useToastStore()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [countrySelect, setCountrySelect] = useState<string | null>(null)
-
-  const utmSource = searchParams?.get('utm_source') || null
-  const utmMedium = searchParams?.get('utm_medium') || null
-  const utmCampaign = searchParams?.get('utm_campaign') || null
-  const utmContent = searchParams?.get('utm_content') || null
-  const utmTerm = searchParams?.get('utm_term') || null
-  const [gclid, setGclid] = useState<string | null>(null)
-  const [fbclid, setFbclid] = useState<string | null>(null)
 
   const countryOptions = useMemo(() => {
     if (!countries.length) return []
@@ -83,20 +80,6 @@ export const ContactForm = () => {
     }
   }, [ipCurrency])
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const gc = params.get('gclid') || sessionStorage.getItem('gclid')
-    const fb = params.get('fbclid') || sessionStorage.getItem('fbclid')
-    if (gc) {
-      setGclid(gc)
-      sessionStorage.setItem('gclid', gc)
-    }
-    if (fb) {
-      setFbclid(fb)
-      sessionStorage.setItem('fbclid', fb)
-    }
-  }, [])
-
   const {
     control,
     handleSubmit,
@@ -120,6 +103,12 @@ export const ContactForm = () => {
 
     setIsSubmittingLead(true)
 
+    // first-touch: lo guardado en la sesión (gclid, gbraid, wbraid, fbclid, utm_*) más lo de la URL actual
+    const atribucion = getAttributionPayload()
+    // mismo id para el pixel de la página de gracias y Meta CAPI, para que Meta deduplique el Lead
+    const eventId = newEventId()
+    rememberLeadEventId(eventId)
+
     let hubspotOk = false
     try {
       const res = await fetch('/api/lead', {
@@ -133,14 +122,9 @@ export const ContactForm = () => {
           telefono: telefonoConPrefijo,
           facturas_pendientes: data.facturas_pendientes,
           alguien_cobrando: data.alguien_cobrando,
-          utmSource: utmSource ?? undefined,
-          utmMedium: utmMedium ?? undefined,
-          utmCampaign: utmCampaign ?? undefined,
-          utmContent: utmContent ?? undefined,
-          utmTerm: utmTerm ?? undefined,
-          gclid: gclid ?? undefined,
-          fbclid: fbclid ?? undefined,
-          landingPage: window.location.href,
+          ...atribucion,
+          landingPage: landingPageUrl(),
+          eventId,
         }),
       })
       const json = await res.json().catch(() => ({ ok: false }))
@@ -170,10 +154,10 @@ export const ContactForm = () => {
       nombreEmpresa: data.empresa,
       mensaje: '',
       howFound: '',
-      utmSource: utmSource || undefined,
-      utmMedium: utmMedium || undefined,
-      utmCampaign: utmCampaign || undefined,
-      utmContent: utmContent || undefined,
+      utmSource: atribucion.utmSource,
+      utmMedium: atribucion.utmMedium,
+      utmCampaign: atribucion.utmCampaign,
+      utmContent: atribucion.utmContent,
     }
     postContactFormMutate(contactPayload, {
       onSettled: () => {
