@@ -27,7 +27,6 @@ export const ThankyouPage = () => {
       origin: 'recupera',
     })
     if (window.gtag) {
-      window.gtag('event', 'completar_formulario', { product: 'recupera' })
       window.gtag('event', 'conversion', { send_to: 'AW-17962976949/sCCeCNfunKccELWNtfVC' })
     }
     if (window.fbq) {
