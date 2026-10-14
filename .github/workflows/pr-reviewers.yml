@@ -1,0 +1,46 @@
+name: PR Reviewers
+
+# Asigna a los expertos de .github/REVIEWERS como reviewers cuando el autor del
+# PR no es uno de ellos. pull_request_target para que funcione también con PRs
+# desde forks; no hace checkout del código del PR, solo llama a la API.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+    branches: [main, staging, dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  assign:
+    name: Asignar reviewers
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # La lista se lee de la rama destino; si aún no existe ahí, de dev.
+          read_experts() {
+            gh api "repos/$REPO/contents/.github/REVIEWERS?ref=$1" --jq .content 2>/dev/null \
+              | base64 -d | grep -v '^#' | grep -v '^[[:space:]]*$'
+          }
+          EXPERTS=$(read_experts "$BASE" || read_experts dev)
+          if [ -z "$EXPERTS" ]; then
+            echo "::error::.github/REVIEWERS no existe o está vacío"; exit 1
+          fi
+
+          if echo "$EXPERTS" | grep -qixF "$AUTHOR"; then
+            echo "@$AUTHOR es experto: no requiere review."
+            exit 0
+          fi
+
+          for u in $EXPERTS; do
+            gh api -X POST "repos/$REPO/pulls/$PR/requested_reviewers" -f "reviewers[]=$u" >/dev/null \
+              && echo "Asignado @$u" || echo "::warning::No se pudo asignar a @$u"
+          done
