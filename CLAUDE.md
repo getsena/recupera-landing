@@ -6,7 +6,7 @@ Guía para Claude Code en este repositorio.
 
 recupera landing
 
-**Repo:** `flujopay/recupera-landing`
+**Repo:** `getsena/recupera-landing`
 **Stack:** Next.js / React
 **Puerto local:** N/A
 
