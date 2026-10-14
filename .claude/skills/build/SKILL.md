@@ -354,6 +354,31 @@ Marcar el work-item con label `review` y quitar `in-progress`:
 gh issue edit $PARENT_N --add-label "review" --remove-label "in-progress"
 ```
 
+### 6.5.1. Asignar revisores y avisar quién debe aprobar
+
+Inmediatamente después de abrir el PR (o al llegar a 6.6 con un PR preexistente), asignar
+como reviewers a los code owners de la rama destino excepto al autor, y decirle al dev quién
+tiene que aprobar. No se pregunta: es parte de abrir el PR.
+
+```bash
+BASE=$(gh pr view "$PR_NUMBER" --json baseRefName --jq .baseRefName)
+AUTHOR=$(gh pr view "$PR_NUMBER" --json author --jq .author.login)
+OWNERS=$(gh api "repos/{owner}/{repo}/contents/.github/CODEOWNERS?ref=$BASE" --jq .content 2>/dev/null \
+  | base64 -d 2>/dev/null | awk '$1=="*"{for(i=2;i<=NF;i++) print $i}' | tr -d '@' | grep -vxF "$AUTHOR")
+if [ -z "$OWNERS" ]; then
+  OWNERS=$(gh api "repos/{owner}/{repo}/collaborators" \
+    --jq '.[] | select(.permissions.push) | .login' | grep -vxF "$AUTHOR")
+fi
+REQUIRED=$(gh api "repos/{owner}/{repo}/branches/$BASE/protection/required_pull_request_reviews" \
+  --jq .required_approving_review_count 2>/dev/null || echo "?")
+for u in $OWNERS; do gh pr edit "$PR_NUMBER" --add-reviewer "$u" >/dev/null; done
+echo "PR #$PR_NUMBER → $BASE. Necesita $REQUIRED aprobación(es) de: $(echo $OWNERS | sed 's/ /, @/g; s/^/@/')"
+```
+
+Reportar al dev en el resumen del PR: **quién tiene que aprobar** (lista de `$OWNERS`) y
+**cuántas aprobaciones** exige la rama (`$REQUIRED`). El autor nunca puede aprobar su propio PR.
+Si `$OWNERS` queda vacío, avisar que no hay nadie más que pueda aprobar y que el PR quedará bloqueado.
+
 **Multi-repo:** si el work-item afecta varios repos, abrir un PR por repo (nunca consolidar repos distintos en un solo PR). Cada PR cierra las tasks que le corresponden a ese repo.
 
 ### 6.6. Elegir el camino de review/merge
