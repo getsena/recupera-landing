@@ -217,8 +217,9 @@ export async function createDeal(
   contactId: string,
   deal: { dealname: string; description: string },
   dedupe = false
-): Promise<void> {
-  if (dedupe && (await hasOpenDeal(token, contactId, deal.dealname))) return
+): Promise<boolean> {
+  // Devuelve true si creó un negocio nuevo y false si ya había uno abierto (reenvío del formulario).
+  if (dedupe && (await hasOpenDeal(token, contactId, deal.dealname))) return false
 
   const res = await fetch(`${HS_API}/crm/v3/objects/deals`, {
     method: 'POST',
@@ -251,6 +252,7 @@ export async function createDeal(
     console.error(`[HubSpot] no se pudo asociar el negocio al contacto: ${detail}`)
     throw new Error(`associate deal failed: ${detail}`)
   }
+  return true
 }
 
 export async function addToList(token: string, contactId: string, listId: string): Promise<void> {

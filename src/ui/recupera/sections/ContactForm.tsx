@@ -13,6 +13,7 @@ import { useCurrencyStore } from '@/lib/store/useCurrencyStore'
 import { useToastStore } from '@/lib/store/useToastStore'
 import { ContactFormRequest } from '@/lib/types/contact'
 import Button from '@/ui/shared/Button'
+import { TurnstileWidget, useTurnstile } from '@/ui/shared/Turnstile'
 import { Input } from '@/ui/shared/Input'
 import SimpleCountrySelect, { OptionSelect } from '@/ui/shared/SimpleCountrySelect'
 import Link from 'next/link'
@@ -40,6 +41,7 @@ type FormData = {
 export const ContactForm = () => {
   const { postContactFormAsync } = usePostContactForm()
   const [isSubmittingLead, setIsSubmittingLead] = useState(false)
+  const turnstile = useTurnstile()
   const { data: countries = [] } = useCountries()
   const { ipCurrency } = useCurrencyStore()
   const { showToast } = useToastStore()
@@ -127,6 +129,9 @@ export const ContactForm = () => {
       utmContent: atribucion.utmContent,
     }
 
+    // Token de Turnstile (no bloquea: sin token el servidor marca el lead como sin verificar)
+    const turnstileToken = await turnstile.getToken()
+
     // El lead se guarda en HubSpot y en el backend: basta con que uno lo reciba para no perderlo.
     const result = await submitLead({
       saveCrm: async () => {
@@ -143,6 +148,7 @@ export const ContactForm = () => {
             alguien_cobrando: data.alguien_cobrando,
             ...atribucion,
             landingPage: landingPageUrl(),
+            'cf-turnstile-response': turnstileToken,
             eventId,
           }),
           signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
@@ -158,6 +164,8 @@ export const ContactForm = () => {
 
     setIsSubmittingLead(false)
     if (!result.ok) {
+      // El token es de un solo uso: el siguiente intento necesita uno nuevo.
+      turnstile.reset()
       showToast({
         iconType: 'error',
         message: 'Error al enviar el formulario',
@@ -378,6 +386,8 @@ export const ContactForm = () => {
                 Política de Privacidad
               </Link>
             </p>
+
+            <TurnstileWidget turnstile={turnstile} />
 
             <Button
               type="submit"
