@@ -1,0 +1,12 @@
+# CODEOWNERS — revisión obligatoria de PRs a dev y main.
+# Docs: https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Solo estos owners pueden aprobar y mergear. Quien abre el PR no puede aprobar el suyo.
+# Jazmín y Francisco colaboran vía PR; el merge lo hace un owner hasta certificar su flujo.
+
+*  @nicoariffo @sagajardo @RenildoChavezFlujolink
+
+# Paths críticos
+/.github/   @nicoariffo @sagajardo @RenildoChavezFlujolink
+/CLAUDE.md  @nicoariffo @sagajardo @RenildoChavezFlujolink
+/.claude/   @nicoariffo @sagajardo @RenildoChavezFlujolink
