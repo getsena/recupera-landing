@@ -176,12 +176,12 @@ test.describe('createDeal: falla de la asociación deal-contacto', () => {
     }
   })
 
-  test('si la asociación responde bien no lanza', async () => {
+  test('si la asociación responde bien no lanza y devuelve true (negocio creado)', async () => {
     const m = mockHubspot({})
     try {
       await expect(
         createDeal('t', '10', { dealname: 'Recupera — Acme', description: 'x' }, false)
-      ).resolves.toBeUndefined()
+      ).resolves.toBe(true)
     } finally {
       m.restore()
     }
