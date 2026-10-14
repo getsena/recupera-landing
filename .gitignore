@@ -47,3 +47,5 @@ next-env.d.ts
 playwright-report/
 test-results/
 .playwright-cache/
+CLAUDE.local.md
+.claude/settings.local.json
