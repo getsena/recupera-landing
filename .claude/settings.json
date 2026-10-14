@@ -2,11 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/no-edit-without-plan.sh"
+            "command": "python3 -c 'import sys, json, re\ntry:\n    data = json.load(sys.stdin)\n    file_path = data.get(\"tool_input\", {}).get(\"file_path\", \"\")\nexcept Exception:\n    sys.exit(0)\nif re.search(r\"(\\.claude/projects/.*/memory/|\\.claude/plans/)\", file_path):\n    print(\"BLOCKED: contexto local prohibido. Política context-policy.md: contexto vive en repos commiteados (rule, ADR, domain-catalog, CLAUDE.md, issue comment, PR description). Invocar /capture-context para decidir dónde va este contenido.\", file=sys.stderr)\n    sys.exit(2)\nsys.exit(0)'"
           }
         ]
       }
