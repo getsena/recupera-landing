@@ -371,7 +371,10 @@ if [ -z "$OWNERS" ]; then
 fi
 REQUIRED=$(gh api "repos/{owner}/{repo}/branches/$BASE/protection/required_pull_request_reviews" \
   --jq .required_approving_review_count 2>/dev/null || echo "?")
-for u in $OWNERS; do gh pr edit "$PR_NUMBER" --add-reviewer "$u" >/dev/null; done
+# REST en vez de `gh pr edit --add-reviewer` (falla por Projects classic deprecado)
+for u in $OWNERS; do
+  gh api -X POST "repos/{owner}/{repo}/pulls/$PR_NUMBER/requested_reviewers" -f "reviewers[]=$u" >/dev/null
+done
 echo "PR #$PR_NUMBER → $BASE. Necesita $REQUIRED aprobación(es) de: $(echo $OWNERS | sed 's/ /, @/g; s/^/@/')"
 ```
 
