@@ -1,0 +1,12 @@
+# Revisores expertos de PRs hacia dev y main. Un login de GitHub por línea.
+#
+# - PR abierto por alguien de esta lista: no requiere review (bypass de admin
+#   en el ruleset "aprobacion-externos"). No se asigna a nadie.
+# - PR abierto por cualquier otra persona: requiere 1 aprobación y se asigna
+#   automáticamente a todos los de esta lista (.github/workflows/pr-reviewers.yml).
+#
+# Quien se agregue aquí debe tener rol admin en el repo, o el ruleset le seguirá
+# exigiendo aprobación.
+nicoariffo
+sagajardo
+RenildoChavezFlujolink
