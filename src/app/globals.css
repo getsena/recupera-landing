@@ -69,6 +69,13 @@
   scale: 1.05;
 }
 
+/* Con el CTA fijo de móvil a la vista, el botón de WhatsApp sube para no taparlo. */
+@media (max-width: 767px) {
+  body:has(.sticky-mobile-cta) .btn-floating-whatsapp {
+    bottom: 6.5rem;
+  }
+}
+
 .btn-floating-whatsapp svg {
   width: 100%;
   height: 100%;

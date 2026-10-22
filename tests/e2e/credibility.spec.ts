@@ -8,6 +8,7 @@ test('el logo wall muestra los clientes vigentes', async ({ page }) => {
   await expect(section.getByRole('heading', { name: 'Empresas que ya cobran con Sena' })).toBeVisible()
   await expect(section.getByAltText("L'Oréal").first()).toBeAttached()
   await expect(section.getByAltText('Científica Andina').first()).toBeAttached()
+  await expect(section.getByAltText('Recsa').first()).toBeAttached()
 })
 
 test('el logo wall no muestra clientes retirados', async ({ page }) => {
@@ -16,5 +17,4 @@ test('el logo wall no muestra clientes retirados', async ({ page }) => {
   const section = page.locator('#clientes')
   await expect(section.getByAltText('Proweld')).toHaveCount(0)
   await expect(section.getByAltText('Aquarius Consulting')).toHaveCount(0)
-  await expect(section.getByAltText('Recsa')).toHaveCount(0)
 })

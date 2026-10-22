@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import Whatsapp from '../shared/WhatsApp'
 import { recuperaFaqJsonLd, recuperaServiceJsonLd } from './data/faqs'
 import { SectionFromQuery } from './SectionFromQuery'
 import { CaseSection } from './sections/CaseForm/CaseSection'
@@ -11,10 +12,11 @@ import { OperaBridge } from './sections/OperaBridge'
 import { Pricing } from './sections/Pricing'
 import { RecuperaFooter } from './sections/RecuperaFooter'
 import { RecuperaHeader } from './sections/RecuperaHeader'
+import { StickyMobileCTA } from './sections/StickyMobileCTA'
 import { UseCases } from './sections/UseCases'
 
 // Componente de servidor: todo el contenido (incluidas las respuestas de la FAQ) va en el HTML inicial.
-// Solo el formulario se hidrata.
+// Solo el formulario, el CTA fijo de móvil y el botón de WhatsApp se hidratan.
 export const RecuperaPage = () => (
   <div className="min-h-screen flex flex-col font-adobe text-brand-primary-dark text-[17px] leading-[1.55]">
     <script
@@ -41,5 +43,7 @@ export const RecuperaPage = () => (
       <CaseSection />
     </main>
     <RecuperaFooter />
+    <StickyMobileCTA />
+    <Whatsapp message="Hola, quiero información sobre Recupera para gestionar mi cartera vencida." animated />
   </div>
 )

@@ -7,6 +7,7 @@ const clients = [
   { name: 'Científica Andina', logo: AssetImage.cientificaLogo.src, height: 'h-[34px]' },
   { name: 'Inversora Maruz', logo: AssetImage.maruzLogo.src, height: 'h-[52px]' },
   { name: 'AOM', logo: AssetImage.aomLogo.src, height: 'h-[26px]' },
+  { name: 'Recsa', logo: AssetImage.recsaLogo.src, height: 'h-[34px]' },
 ]
 
 export const Clients = () => (

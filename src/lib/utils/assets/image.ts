@@ -16,6 +16,7 @@ import lorealLogo from '@/public/images/loreal_logo.png'
 import maruzLogo from '@/public/images/maruz_logo.png'
 import nosotros1 from '@/public/images/nosotros1.png'
 import nosotros2 from '@/public/images/nosotros2.png'
+import recsaLogo from '@/public/images/recsa_logo.png'
 import recuperaGirl from '@/public/images/recupera_girl.jpeg'
 import rioSena from '@/public/images/rio_sena.jpg'
 import senaLogoOrange from '@/public/images/sena_logo_orange.png'
@@ -46,4 +47,5 @@ export class AssetImage {
   static evalua = evalua
   static autogestion = autogestion
   static recuperaGirl = recuperaGirl
+  static recsaLogo = recsaLogo
 }
