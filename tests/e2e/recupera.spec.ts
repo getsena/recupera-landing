@@ -150,14 +150,21 @@ test('/thankyou muestra confirmación, embed HubSpot y botón WhatsApp', async (
   expect(await embedContainer.getAttribute('data-src')).toContain('meetings.hubspot.com/francisco502')
 
   await expect(page.getByRole('link', { name: /abrir calendario/i })).toBeVisible()
+  await expect(page.getByText(/sin compromiso/i)).toHaveCount(0)
   const waHref = await page.getByRole('link', { name: /hablar por whatsapp/i }).getAttribute('href')
   expect(waHref).toContain('wa.me/56977290160')
 })
 
-test('móvil 375 px: CTA del hero visible y sin scroll horizontal', async ({ page }) => {
+test('móvil 375 px: CTA del hero y CTA fijo visibles, WhatsApp y sin scroll horizontal', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto('/')
   await expect(page.getByRole('link', { name: 'Evalúa tu cartera gratis' }).first()).toBeVisible()
+  // CTA fijo de móvil: se oculta cuando el formulario está a la vista
+  const fijo = page.locator('div.fixed a[href="#caso"]')
+  await expect(fijo).toBeVisible()
+  await page.locator('#caso').scrollIntoViewIfNeeded()
+  await expect(fijo).toHaveCount(0)
+  await expect(page.locator('.btn-floating-whatsapp')).toBeAttached()
   const ancho = await page.evaluate(() => document.documentElement.scrollWidth)
   expect(ancho).toBeLessThanOrEqual(375)
 })
