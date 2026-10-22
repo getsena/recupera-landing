@@ -13,7 +13,11 @@ function sources(dir: string): { path: string; text: string }[] {
   })
 }
 
-const GRACIAS: [string, string][] = [['src/ui/thankyou/ThankyouPage.tsx','recupera']]
+const GRACIAS: [string, string][] = [
+  ['src/ui/thankyou/ThankyouPage.tsx', 'recupera'],
+  // la landing muestra la gracias en el mismo formulario, sin pasar por /thankyou
+  ['src/ui/recupera/sections/CaseForm/CaseForm.tsx', 'recupera'],
+]
 
 test.describe('completar_formulario de GA4: una sola fuente', () => {
   test('el código no emite completar_formulario con gtag', () => {

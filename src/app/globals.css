@@ -18,14 +18,20 @@
   --color-surface-secondary:        #F9F9F9;
   --color-surface-blue-soft:        #EEF3FB;
   --color-border-default:           #EDEDED;
+  --color-border-input:             #d6dae4;
 
   /* ─── Texto ──────────────────────────────────── */
   --color-text-primary:             #1e2c50;
   --color-text-secondary:           #71717a;
   --color-text-disabled:            #a1a1aa;
+  --color-text-body:                #3d4766;
+  --color-text-muted:               #5b6685;
+  --color-text-on-dark:             #c9d6f2;
+  --color-text-on-dark-accent:      #9dbbf0;
 
   /* ─── Semánticos ─────────────────────────────── */
   --color-success:                  #16a34a;
+  --color-success-soft:             #e7f5ec;
   --color-error:                    #dc2626;
   --color-warning:                  #f59e0b;
 

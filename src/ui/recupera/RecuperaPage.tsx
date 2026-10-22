@@ -1,61 +1,45 @@
-'use client'
-
-import { useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
-import { Footer } from '../layout/Footer'
-import { Header } from '../layout/Header'
-import Whatsapp from '../shared/WhatsApp'
-import { ContactForm } from './sections/ContactForm'
-import { Credibility } from './sections/Credibility'
+import { Suspense } from 'react'
+import { recuperaFaqJsonLd, recuperaServiceJsonLd } from './data/faqs'
+import { SectionFromQuery } from './SectionFromQuery'
+import { CaseSection } from './sections/CaseForm/CaseSection'
+import { Clients } from './sections/Clients'
 import { FAQ } from './sections/FAQ'
-import { FinalCTA } from './sections/FinalCTA'
 import { Hero } from './sections/Hero'
 import { HowItWorks } from './sections/HowItWorks'
-import { PricingModel } from './sections/PricingModel'
-import { StickyMobileCTA } from './sections/StickyMobileCTA'
+import { KeyFigures } from './sections/KeyFigures'
+import { OperaBridge } from './sections/OperaBridge'
+import { Pricing } from './sections/Pricing'
+import { RecuperaFooter } from './sections/RecuperaFooter'
+import { RecuperaHeader } from './sections/RecuperaHeader'
 import { UseCases } from './sections/UseCases'
 
-export const RecuperaPage = () => {
-  const searchParams = useSearchParams()
-
-  useEffect(() => {
-    const section = searchParams.get('section')
-    if (!section) return
-
-    const tryScroll = (attempts = 0) => {
-      const element = document.getElementById(section)
-      if (element) {
-        const offset = 72
-        const elementPosition = element.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.pageYOffset - offset
-        window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
-      } else if (attempts < 10) {
-        setTimeout(() => tryScroll(attempts + 1), 100)
-      }
-    }
-
-    tryScroll()
-  }, [searchParams])
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header variant="primary" />
-      <div className="grow">
-        <Hero />
-        <HowItWorks />
-        <PricingModel />
-        <Credibility />
-        <UseCases />
-        <FAQ />
-        <FinalCTA />
-        <ContactForm />
-      </div>
-      <Footer />
-      <StickyMobileCTA />
-      <Whatsapp
-        message="Hola, quiero información sobre Recupera para gestionar mi cartera vencida."
-        animated
-      />
-    </div>
-  )
-}
+// Componente de servidor: todo el contenido (incluidas las respuestas de la FAQ) va en el HTML inicial.
+// Solo el formulario se hidrata.
+export const RecuperaPage = () => (
+  <div className="min-h-screen flex flex-col font-adobe text-brand-primary-dark text-[17px] leading-[1.55]">
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(recuperaServiceJsonLd) }}
+    />
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(recuperaFaqJsonLd) }}
+    />
+    <Suspense>
+      <SectionFromQuery />
+    </Suspense>
+    <RecuperaHeader />
+    <main className="grow">
+      <Hero />
+      <KeyFigures />
+      <HowItWorks />
+      <Pricing />
+      <Clients />
+      <UseCases />
+      <OperaBridge />
+      <FAQ />
+      <CaseSection />
+    </main>
+    <RecuperaFooter />
+  </div>
+)

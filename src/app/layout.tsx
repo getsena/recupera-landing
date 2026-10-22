@@ -11,31 +11,31 @@ import './globals.css'
 import AttributionCapture from '@/ui/shared/AttributionCapture'
 import Providers from './providers'
 
+const TITLE = 'Sena Recupera · Cobranza B2B de cartera vencida en Chile y Perú'
+const DESCRIPTION =
+  'Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede. Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo.'
+
 export const metadata: Metadata = {
-  title: 'Recupera tu Cartera Vencida | Empresa de Cobranza B2B Chile',
-  description:
-    'Empresa de cobranza B2B en Chile. Recuperamos tu cartera vencida con publicación DICOM. Solo pagas si lo logramos. +85% recupero promedio.',
+  title: TITLE,
+  description: DESCRIPTION,
   keywords:
-    'empresa de cobranza, empresa de cobranza b2b chile, cobranza b2b chile, recuperar cartera vencida, cobranza contingente, cobranza online, cobrar facturas vencidas, facturas impagas, publicacion dicom, externalizar cobranza b2b, servicio de cobranza empresas',
-  authors: [{ name: 'Recupera' }],
+    'cobranza b2b, cobranza de cartera vencida, recuperar cartera vencida, cobranza b2b chile, cobranza b2b perú, cobrar facturas vencidas, facturas impagas, cobranza contingente, externalizar cobranza b2b, empresa de cobranza, publicacion dicom chile',
+  authors: [{ name: 'Sena', url: 'https://www.somossena.com' }],
   robots: { index: true, follow: true },
   metadataBase: new URL('https://recupera.somossena.com'),
-  alternates: { canonical: '/' },
   twitter: {
     card: 'summary_large_image',
-    title: 'Recupera tu Cartera Vencida | Empresa de Cobranza B2B Chile',
-    description:
-      'Empresa de cobranza B2B en Chile. Solo pagas si recuperamos tu cartera vencida. +85% de recupero promedio.',
+    title: TITLE,
+    description: DESCRIPTION,
     images: ['https://recupera.somossena.com/sena-crm-lite.jpg'],
   },
   openGraph: {
-    title: 'Recupera tu Cartera Vencida | Empresa de Cobranza B2B Chile',
-    description:
-      'Empresa de cobranza B2B en Chile. Recuperamos tu cartera vencida con publicación DICOM. Solo pagas si lo logramos. +85% recupero.',
+    title: TITLE,
+    description: DESCRIPTION,
     type: 'website',
     url: 'https://recupera.somossena.com',
     images: ['https://recupera.somossena.com/sena-crm-lite.jpg'],
-    siteName: 'Recupera',
+    siteName: 'Sena',
     locale: 'es_CL',
   },
   other: {
@@ -56,54 +56,6 @@ export default async function RootLayout({
       <html lang="es" dir="ltr">
         <GoogleTagManager gtmId="GTM-M9XSZFKQ" />
         <head>
-          <Script id="faq-schema" type="application/ld+json" strategy="beforeInteractive">
-            {JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'FAQPage',
-              mainEntity: [
-                {
-                  '@type': 'Question',
-                  name: '¿Cuánto toma ver resultados?',
-                  acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Primeros contactos en 48-72h. Acuerdos típicamente en 2 semanas.',
-                  },
-                },
-                {
-                  '@type': 'Question',
-                  name: '¿Qué pasa si no recuperan nada?',
-                  acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'No pagas nada. Modelo 100% contingente: solo cobramos un porcentaje sobre el monto efectivamente recuperado.',
-                  },
-                },
-                {
-                  '@type': 'Question',
-                  name: '¿Se preservan las relaciones comerciales?',
-                  acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Sí. Nuestro enfoque profesional preserva los vínculos comerciales en cada gestión de cobranza B2B.',
-                  },
-                },
-                {
-                  '@type': 'Question',
-                  name: '¿Con qué tipo de cartera trabajan?',
-                  acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Trabajamos con cartera vencida de +60 días, incluyendo facturas impagas y cuentas por cobrar B2B. Para gestión preventiva antes del vencimiento, tenemos otra solución — consultanos.',
-                  },
-                },
-                {
-                  '@type': 'Question',
-                  name: '¿En qué países operan?',
-                  acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: '15 países en LATAM: Chile, Perú, Colombia, México, Argentina, Brasil, y más. Presencia local con conocimiento del mercado en cada país.',
-                  },
-                },
-              ],
-            })}
-          </Script>
           {/* Google Ads — Recupera (AW-17962976949 / conv: sCCeCNfunKccELWNtfVC) */}
           <Script
             src="https://www.googletagmanager.com/gtag/js?id=AW-17962976949"

@@ -1,52 +1,55 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const content = `# Recupera — Cobranza B2B con publicación DICOM
+  const content = `# Sena Recupera — Cobranza B2B de cartera vencida en Chile y Perú
 
-> Servicio de recuperación de cartera vencida para empresas B2B en Chile y LATAM.
-> Solo pagas si recuperamos. Sin costo fijo, sin riesgo.
+> Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede.
+> Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo.
 
-## Qué hace Recupera
+## Qué hace Sena Recupera
 
-Recupera gestiona la cobranza de facturas impagas y cartera vencida B2B mediante:
-- Gestión preventiva antes de la mora
-- Publicación en registros de morosidad (DICOM, Boletín Comercial)
-- Gestión post-publicación hasta el cobro efectivo
+Sena Recupera gestiona la cobranza de facturas B2B que ya vencieron:
+- Evaluación gratis de la cartera: antigüedad, montos y gestiones previas. Respuesta en 24 horas.
+- Propuesta con lo que se puede esperar de la cartera antes de empezar.
+- Gestión por correo, SMS y WhatsApp, con una ejecutiva del equipo de Sena para las llamadas y los
+  casos complejos. La gestión parte por la conversación y cuida la relación con el cliente.
+- Cuando no hay respuesta, publicación en DICOM (Chile, a través de Equifax) como respaldo, no como
+  primer paso.
 
-No realizamos gestión judicial. Todo el proceso es externo a los tribunales.
+## Precio
 
-## Modelo de negocio
+- 15% sobre el monto efectivamente recuperado.
+- Sin ticket mínimo: cualquier tamaño de cartera.
+- Sin costo fijo ni mensualidad.
+- Si no recuperamos, no pagas.
 
-- Sin costo de evaluación
-- Sin setup ni mensualidad
-- Comisión solo sobre el monto efectivamente recuperado
-- Si no recuperamos, no pagas nada
+## Cifras
 
-## Métricas clave
+- +85% de tasa de recuperación.
 
-- 85% de tasa de recupero promedio
-- Primeros contactos en 48-72h
-- Acuerdos típicamente en 2 semanas
+## Qué cartera toma
 
-## A quién va dirigido
+- Facturas vencidas hace más de 60 días.
+- Foco en cobranza B2B; también evaluamos carteras B2C y mixtas.
+- Operamos en Chile y Perú.
+- Los plazos de recuperación dependen de cada cartera y se presentan en la propuesta.
 
-Empresas B2B con:
-- Cartera vencida de +60 días
-- Facturas impagas que no responden a gestión interna
-- Necesidad de externalizar cobranza sin riesgo financiero
-- Operación en Chile, Perú y otros países de LATAM
+Para la cartera que todavía no vence está Ópera, el equipo de cobranza externo de Sena:
+https://agente.somossena.com
 
 ## Páginas principales
 
-- [Inicio](https://recupera.somossena.com): propuesta de valor, modelo contingente, cómo funciona
-- [Precios](https://recupera.somossena.com#precios): detalle del modelo de contingencia
-- [Casos de uso](https://recupera.somossena.com#casos-uso): tipos de cartera que gestionamos
-- [Contacto](https://recupera.somossena.com#contacto): evaluación gratuita de cartera
+- [Inicio](https://recupera.somossena.com): propuesta, cómo funciona y precio
+- [Cómo funciona](https://recupera.somossena.com/#como): los cuatro pasos
+- [Precio](https://recupera.somossena.com/#precio): 15% sobre lo recuperado
+- [Preguntas frecuentes](https://recupera.somossena.com/#faq)
+- [Evaluación gratis](https://recupera.somossena.com/#caso): formulario de contacto
 
-## Contacto
+## Sena
 
-Web: https://recupera.somossena.com
-Empresa: Sena — somossena.com
+- Sena: https://www.somossena.com
+- Ópera: https://agente.somossena.com
+- Contacto: hola@somossena.com
 `.trim()
 
   return new NextResponse(content, {

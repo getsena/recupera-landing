@@ -1,75 +1,51 @@
-import { CheckCircle, FileSearch, Lightbulb, TrendingUp, Users } from 'lucide-react'
+import { Container, Dot, Eyebrow, SectionTitle } from './shared'
 
-const steps = [
+const pasos = [
   {
-    title: 'Evaluación Gratuita',
-    description: 'Analizamos tu cartera y priorizamos casos según probabilidad de recuperación.',
-    timeline: '24-48 horas',
-    icon: FileSearch,
+    titulo: 'Evaluación gratis',
+    detalle: 'Revisamos antigüedad, montos y gestiones previas. Te respondemos en 24 horas.',
   },
   {
-    title: 'Plan de Recuperación',
-    description:
-      'Definimos si iniciamos con gestión preventiva, publicación DICOM o gestión post-mora, según el estado de cada cuenta.',
-    timeline: '48 horas',
-    icon: Lightbulb,
+    titulo: 'Propuesta',
+    detalle: 'Te decimos qué esperar de tu cartera antes de empezar.',
   },
   {
-    title: 'Gestión Humana + IA',
-    description:
-      'Nuestro equipo contacta a tus deudores con publicación DICOM cuando corresponde. Preservamos la relación donde es posible.',
-    timeline: 'Continuo',
-    icon: Users,
+    titulo: 'Gestión',
+    detalle:
+      'Secuencias por correo, SMS y WhatsApp, y una ejecutiva del equipo de Sena para las llamadas y los casos complejos. Cuidamos la relación donde todavía se puede sostener; cuando no hay respuesta, la publicación en DICOM es el respaldo.',
   },
   {
-    title: 'Recuperación + Dashboard',
-    description: 'Pagos directos a tu cuenta. Dashboard en tiempo real con progreso y proyecciones.',
-    timeline: 'Tiempo real',
-    icon: TrendingUp,
+    titulo: 'Liquidación',
+    detalle: 'Cobramos 15% sobre lo efectivamente recuperado.',
   },
 ]
 
-export const HowItWorks = () => {
-  return (
-    <div id="como-funciona" className="py-12 mx-auto max-w-[1280px]">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-12">
-        <div className="text-left mb-12">
-          <h2 className="text-brand-primary-dark text-3xl md:text-4xl font-extrabold mb-4">
-            ¿Cómo recuperamos <span className="text-brand-primary">tu cartera?</span>
-          </h2>
-          <p className="font-adobe text-black mt-2 text-lg leading-5">
-            Proceso con más de 40 años de experiencia operativa en cobranza en 15 países de LATAM
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          {steps.map((step) => {
-            const Icon = step.icon
-            return (
-              <div key={step.title} className="h-full rounded-2xl bg-[#F9F9F9]  px-6 py-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-brand-secondary flex items-center justify-center shrink-0">
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                </div>
-
-                <h3 className="mt-5 text-black font-extrabold uppercase leading-tight text-xl">
-                  {step.title}
-                </h3>
-
-                <p className="mt-3 text-[#939393] text-md leading-5">{step.description}</p>
-
-                <div className="flex items-center gap-2 mt-5">
-                  <CheckCircle className="h-4 w-4 text-[#939393] shrink-0" />
-                  <span className="text-[#939393]">
-                    Timeline: <span className="font-semibold text-brand-primary">{step.timeline}</span>
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+export const HowItWorks = () => (
+  <section id="como" aria-labelledby="como-titulo" className="scroll-mt-24">
+    {/* Ancla anterior de esta sección. */}
+    <span id="como-funciona" className="block scroll-mt-24" aria-hidden="true" />
+    <Container className="py-20 md:py-[104px] flex flex-col gap-11">
+      <div className="flex flex-col gap-[18px] max-w-[760px]">
+        <Eyebrow>Cómo funciona</Eyebrow>
+        <SectionTitle id="como-titulo">
+          Así recuperamos tu cartera
+          <Dot />
+        </SectionTitle>
       </div>
-    </div>
-  )
-}
+      <ol className="m-0 p-0 list-none grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t-2 border-brand-primary-dark">
+        {pasos.map((p, i) => (
+          <li
+            key={p.titulo}
+            className="py-7 flex flex-col gap-2.5 border-b border-border-default sm:odd:pr-6 sm:even:pl-6 sm:even:border-l lg:px-6 lg:border-l lg:first:pl-0 lg:first:border-l-0 lg:last:pr-0"
+          >
+            <span aria-hidden="true" className="font-caslon text-[34px] leading-none text-brand-primary">
+              {i + 1}
+            </span>
+            <h3 className="m-0 text-[21px] font-bold">{p.titulo}</h3>
+            <p className="m-0 text-text-muted">{p.detalle}</p>
+          </li>
+        ))}
+      </ol>
+    </Container>
+  </section>
+)

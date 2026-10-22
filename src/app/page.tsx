@@ -1,12 +1,10 @@
+import type { Metadata } from 'next'
 import { RecuperaPage } from '@/ui/recupera/RecuperaPage'
-import { Suspense } from 'react'
+
+export const metadata: Metadata = {
+  alternates: { canonical: 'https://recupera.somossena.com' },
+}
 
 export default function Home() {
-  return (
-    <div className="w-full">
-      <Suspense>
-        <RecuperaPage />
-      </Suspense>
-    </div>
-  )
+  return <RecuperaPage />
 }
