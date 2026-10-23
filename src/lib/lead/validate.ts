@@ -13,6 +13,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const FACTURAS = ['1-10', '10-50', '50+'] as const
 export const COBRANDO = ['Sí', 'Si', 'No', 'A veces'] as const
 
+// Opciones del formulario de dos pasos de la landing (bloque `caso`).
+export const CASO_COTIZAR = ['habitual', 'recupera'] as const
+export const CASO_TIPO_CARTERA = ['B2B', 'B2C', 'Mixta'] as const
+export const CASO_NECESIDAD = ['equipo', 'delegar', 'recaudacion', 'dificil'] as const
+export const CASO_CANALES = ['Correo', 'SMS', 'WhatsApp', 'Llamadas'] as const
+export const CASO_ANTIGUEDAD = ['0-30', '31-90', '91-180', '180+'] as const
+const MAX_VOLUMEN = 10_000_000
+const MAX_COMENTARIOS = 1000
+
 export type Attribution = {
   utmSource?: string
   utmMedium?: string
@@ -27,14 +36,30 @@ export type Attribution = {
   eventId?: string
 }
 
+// Respuestas del formulario de dos pasos. No trae «alguien cobrando»: el lead se guarda sin ese campo en
+// vez de inventarlo.
+export type LeadCaso = {
+  cotizar: (typeof CASO_COTIZAR)[number]
+  tipo_cartera: (typeof CASO_TIPO_CARTERA)[number]
+  necesidad: (typeof CASO_NECESIDAD)[number]
+  canales: (typeof CASO_CANALES)[number][]
+  volumen_clientes?: number
+  volumen_facturas?: number
+  antiguedad?: (typeof CASO_ANTIGUEDAD)[number]
+  comentarios?: string
+}
+
 export type LeadPayload = Attribution & {
   nombre: string
+  // Vacío solo en leads con `caso`: el formulario pide nombre y apellido en un solo campo.
   apellido: string
   empresa: string
   email: string
   telefono: string
+  // Vacíos solo en leads con `caso`.
   facturas_pendientes: string
   alguien_cobrando: string
+  caso?: LeadCaso
 }
 
 export type Validated<T> = { ok: true; value: T } | { ok: false; status: number; error: string }
@@ -112,24 +137,73 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
+function oneOf<T extends string>(options: readonly T[], value: unknown): T | undefined {
+  return options.find((o) => o === value)
+}
+
+function volumen(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_VOLUMEN
+    ? value
+    : undefined
+}
+
+// `undefined` = no vino; `null` = vino con un formato inválido (se rechaza el lead).
+function validateCaso(raw: unknown): LeadCaso | undefined | null {
+  if (raw === undefined) return undefined
+  if (!isRecord(raw)) return null
+  const cotizar = oneOf(CASO_COTIZAR, raw.cotizar)
+  const tipo = oneOf(CASO_TIPO_CARTERA, raw.tipo_cartera)
+  const necesidad = oneOf(CASO_NECESIDAD, raw.necesidad)
+  if (!cotizar || !tipo || !necesidad || !Array.isArray(raw.canales)) return null
+  const canales = CASO_CANALES.filter((c) => (raw.canales as unknown[]).includes(c))
+  if (canales.length !== raw.canales.length) return null
+  const comentarios = clean(raw.comentarios)
+  if (comentarios && comentarios.length > MAX_COMENTARIOS) return null
+  return {
+    cotizar,
+    tipo_cartera: tipo,
+    necesidad,
+    canales,
+    volumen_clientes: volumen(raw.volumen_clientes),
+    volumen_facturas: volumen(raw.volumen_facturas),
+    antiguedad: oneOf(CASO_ANTIGUEDAD, raw.antiguedad),
+    comentarios,
+  }
+}
+
+// Tramo de facturas pendientes a partir del número de facturas del formulario de dos pasos.
+export function facturasDelVolumen(n: number | undefined): (typeof FACTURAS)[number] | undefined {
+  if (n === undefined || n < 1) return undefined
+  if (n <= 10) return '1-10'
+  if (n <= 50) return '10-50'
+  return '50+'
+}
+
 export function validateLead(raw: unknown): Validated<LeadPayload> {
   if (!isRecord(raw)) return fail('Payload inválido')
 
+  const caso = validateCaso(raw.caso)
+  if (caso === null) return fail('Datos inválidos')
+
+  // Con `caso`, apellido, facturas pendientes y «alguien cobrando» son opcionales.
   const nombre = required(raw.nombre, 100)
-  const apellido = required(raw.apellido, 100)
+  const apellido = caso ? (optional(raw.apellido, 100) ?? '') : required(raw.apellido, 100)
   const empresa = required(raw.empresa, 100)
   const email = required(raw.email, 254)
   const telefono = required(raw.telefono, 30)
-  const facturas = clean(raw.facturas_pendientes)
-  const cobrando = clean(raw.alguien_cobrando)
+  const facturas = caso
+    ? (clean(raw.facturas_pendientes) ?? facturasDelVolumen(caso.volumen_facturas) ?? '')
+    : clean(raw.facturas_pendientes)
+  const cobrando = caso ? (clean(raw.alguien_cobrando) ?? '') : clean(raw.alguien_cobrando)
 
-  if (!nombre || !apellido || !empresa || !email || !telefono || !facturas || !cobrando) {
+  if (!nombre || apellido === undefined || !empresa || !email || !telefono) {
     return fail('Faltan campos requeridos')
   }
+  if (!caso && (!facturas || !cobrando)) return fail('Faltan campos requeridos')
   if (!EMAIL.test(email)) return fail('Email inválido')
   if (!PHONE.test(telefono)) return fail('Teléfono inválido')
-  if (!(FACTURAS as readonly string[]).includes(facturas)) return fail('Datos inválidos')
-  if (!(COBRANDO as readonly string[]).includes(cobrando)) return fail('Datos inválidos')
+  if (facturas && !(FACTURAS as readonly string[]).includes(facturas)) return fail('Datos inválidos')
+  if (cobrando && !(COBRANDO as readonly string[]).includes(cobrando)) return fail('Datos inválidos')
 
   return {
     ok: true,
@@ -139,8 +213,9 @@ export function validateLead(raw: unknown): Validated<LeadPayload> {
       empresa,
       email,
       telefono,
-      facturas_pendientes: facturas,
-      alguien_cobrando: cobrando,
+      facturas_pendientes: facturas ?? '',
+      alguien_cobrando: cobrando ?? '',
+      caso,
       ...attribution(raw),
     },
   }

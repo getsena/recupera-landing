@@ -26,7 +26,7 @@ const Whatsapp = ({
 
   const finalPhone = isThxPage
     ? ipCurrency === 'PEN'
-      ? '958969041'
+      ? '918272599'
       : '944489673'
     : phoneNumber
       ? phoneNumber
