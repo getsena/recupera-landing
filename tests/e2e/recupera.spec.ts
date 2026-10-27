@@ -90,6 +90,15 @@ test.describe('contenido renderizado en el servidor', () => {
     expect(txt).toContain('https://agente.somossena.com')
     expect(txt).not.toMatch(/preventiva|48-72h|2 semanas|LATAM/i)
   })
+
+  test('llms.txt sin proveedores internos ni países no confirmados, y sus anclas existen', async ({ request }) => {
+    const txt = await (await request.get('/llms.txt')).text()
+    expect(txt).not.toMatch(/kapso|khipu|mercado ?pago|colombia|méxico|mexico|ecuador/i)
+    const html = await (await request.get('/')).text()
+    const anclas = [...txt.matchAll(/recupera\.somossena\.com\/#([\w-]+)/g)].map((m) => m[1])
+    expect(anclas.length).toBeGreaterThan(0)
+    for (const a of anclas) expect(html, `#${a}`).toContain(`id="${a}"`)
+  })
 })
 
 async function completarPaso1(page: Page) {
