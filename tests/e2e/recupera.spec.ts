@@ -45,7 +45,7 @@ test.describe('contenido renderizado en el servidor', () => {
     for (const p of PROHIBIDO) expect(texto, String(p)).not.toMatch(p)
   })
 
-  test('metadata, canonical y JSON-LD de Service y FAQPage', async ({ request }) => {
+  test('metadata, canonical y JSON-LD de Organization, WebSite, Service y FAQPage', async ({ request }) => {
     const html = await (await request.get('/')).text()
     expect(html).toContain('<title>Sena Recupera · Cobranza B2B de cartera vencida en Chile y Perú</title>')
     expect(html).toContain('<link rel="canonical" href="https://recupera.somossena.com"/>')
@@ -59,6 +59,15 @@ test.describe('contenido renderizado en el servidor', () => {
     expect(service.name).toBe('Sena Recupera')
     expect(service.areaServed.map((a: { identifier: string }) => a.identifier)).toEqual(['CL', 'PE'])
     expect(service.offers.priceSpecification.price).toBe(15)
+
+    // entidad compartida con somossena.com, en bloques sueltos o dentro de @graph
+    const nodos = bloques.flatMap((b) => b['@graph'] ?? [b])
+    const org = nodos.find((n) => n['@type'] === 'Organization' && n['@id'])
+    expect(org['@id']).toBe('https://www.somossena.com/#organization')
+    expect(org.sameAs).toContain('https://www.linkedin.com/company/sena-latam/')
+    const website = nodos.find((n) => n['@type'] === 'WebSite')
+    expect(website.publisher['@id']).toBe(org['@id'])
+    expect(service.provider['@id']).toBe(org['@id'])
 
     const faq = bloques.find((b) => b['@type'] === 'FAQPage')
     expect(faq.mainEntity).toHaveLength(8)
