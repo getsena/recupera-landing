@@ -25,7 +25,7 @@ Sena Recupera gestiona la cobranza de facturas B2B que ya vencieron:
 
 ## Qué cartera toma
 
-- Facturas vencidas hace más de 60 días.
+- Facturas vencidas hace más de 30 días.
 - Foco en cobranza B2B; también evaluamos carteras B2C y mixtas.
 - Operamos en Chile y Perú.
 - Los plazos de recuperación dependen de cada cartera y se presentan en la propuesta.

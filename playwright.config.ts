@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 30_000,
   reporter: 'line',
   use: {
-    baseURL: 'https://recupera.somossena.com',
+    baseURL: process.env.E2E_BASE_URL ?? 'https://recupera.somossena.com',
     headless: true,
   },
 })

@@ -19,7 +19,7 @@ export const recuperaFaqs = [
   },
   {
     q: '¿Qué cartera toman?',
-    a: 'Facturas vencidas hace más de 60 días. Para la cartera que todavía no vence, está Ópera.',
+    a: 'Facturas vencidas hace más de 30 días. Para la cartera que todavía no vence, está Ópera.',
   },
   {
     q: '¿Publican en DICOM?',
