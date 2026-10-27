@@ -21,7 +21,7 @@ export const UseCases = () => (
     <span id="casos-uso" className="block scroll-mt-24" aria-hidden="true" />
     <Container className="py-20 md:py-[104px] flex flex-wrap gap-x-[72px] gap-y-10">
       <div className="flex-[1_1_360px] min-w-0 flex flex-col gap-[18px]">
-        <Eyebrow>Para quién · facturas vencidas hace más de 60 días</Eyebrow>
+        <Eyebrow>Para quién · facturas vencidas hace más de 30 días</Eyebrow>
         <SectionTitle id="casos-titulo" size="md">
           ¿Tu empresa está en alguno de estos casos
           <Dot mark="?" />

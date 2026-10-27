@@ -95,7 +95,7 @@ test.describe('contenido renderizado en el servidor', () => {
     const txt = await (await request.get('/llms.txt')).text()
     expect(txt).toContain('15%')
     expect(txt).not.toContain('85%')
-    expect(txt).toContain('más de 60 días')
+    expect(txt).toContain('más de 30 días')
     expect(txt).toContain('https://agente.somossena.com')
     expect(txt).not.toMatch(/preventiva|48-72h|2 semanas|LATAM/i)
   })
