@@ -51,7 +51,7 @@ export const recuperaServiceJsonLd = {
   name: 'Sena Recupera',
   serviceType: 'Cobranza B2B de cartera vencida',
   description:
-    'Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede. Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo. Tasa de recuperación de +85%.',
+    'Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede. Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo.',
   url: 'https://recupera.somossena.com',
   provider: { '@type': 'Organization', name: 'Sena', url: 'https://www.somossena.com' },
   areaServed: [

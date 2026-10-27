@@ -75,10 +75,17 @@ test.describe('contenido renderizado en el servidor', () => {
     )
   })
 
+  test('la landing no publica la cifra de recuperación sin fuente (HTML ni JSON-LD)', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    expect(await page.content()).not.toContain('85%')
+  })
+
   test('llms.txt sin plazos de resultado ni gestión preventiva', async ({ request }) => {
     const txt = await (await request.get('/llms.txt')).text()
     expect(txt).toContain('15%')
-    expect(txt).toContain('+85%')
+    expect(txt).not.toContain('85%')
     expect(txt).toContain('más de 60 días')
     expect(txt).toContain('https://agente.somossena.com')
     expect(txt).not.toMatch(/preventiva|48-72h|2 semanas|LATAM/i)

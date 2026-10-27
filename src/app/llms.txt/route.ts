@@ -23,10 +23,6 @@ Sena Recupera gestiona la cobranza de facturas B2B que ya vencieron:
 - Sin costo fijo ni mensualidad.
 - Si no recuperamos, no pagas.
 
-## Cifras
-
-- +85% de tasa de recuperación.
-
 ## Qué cartera toma
 
 - Facturas vencidas hace más de 60 días.

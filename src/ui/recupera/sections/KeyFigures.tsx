@@ -1,7 +1,7 @@
 import { Container } from './shared'
 
 const cifras = [
-  { valor: '+85%', texto: 'tasa de recuperación' },
+  { valor: '24 h', texto: 'respuesta a tu evaluación gratis' },
   { valor: '15%', texto: 'solo sobre lo recuperado' },
   { valor: '$0', texto: 'costo inicial' },
 ]
