@@ -45,7 +45,7 @@ test.describe('contenido renderizado en el servidor', () => {
     for (const p of PROHIBIDO) expect(texto, String(p)).not.toMatch(p)
   })
 
-  test('metadata, canonical y JSON-LD de Service y FAQPage', async ({ request }) => {
+  test('metadata, canonical y JSON-LD de Organization, WebSite, Service y FAQPage', async ({ request }) => {
     const html = await (await request.get('/')).text()
     expect(html).toContain('<title>Sena Recupera · Cobranza B2B de cartera vencida en Chile y Perú</title>')
     expect(html).toContain('<link rel="canonical" href="https://recupera.somossena.com"/>')
@@ -59,6 +59,15 @@ test.describe('contenido renderizado en el servidor', () => {
     expect(service.name).toBe('Sena Recupera')
     expect(service.areaServed.map((a: { identifier: string }) => a.identifier)).toEqual(['CL', 'PE'])
     expect(service.offers.priceSpecification.price).toBe(15)
+
+    // entidad compartida con somossena.com, en bloques sueltos o dentro de @graph
+    const nodos = bloques.flatMap((b) => b['@graph'] ?? [b])
+    const org = nodos.find((n) => n['@type'] === 'Organization' && n['@id'])
+    expect(org['@id']).toBe('https://www.somossena.com/#organization')
+    expect(org.sameAs).toContain('https://www.linkedin.com/company/sena-latam/')
+    const website = nodos.find((n) => n['@type'] === 'WebSite')
+    expect(website.publisher['@id']).toBe(org['@id'])
+    expect(service.provider['@id']).toBe(org['@id'])
 
     const faq = bloques.find((b) => b['@type'] === 'FAQPage')
     expect(faq.mainEntity).toHaveLength(8)
@@ -75,13 +84,29 @@ test.describe('contenido renderizado en el servidor', () => {
     )
   })
 
+  test('la landing no publica la cifra de recuperación sin fuente (HTML ni JSON-LD)', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    expect(await page.content()).not.toContain('85%')
+  })
+
   test('llms.txt sin plazos de resultado ni gestión preventiva', async ({ request }) => {
     const txt = await (await request.get('/llms.txt')).text()
     expect(txt).toContain('15%')
-    expect(txt).toContain('+85%')
+    expect(txt).not.toContain('85%')
     expect(txt).toContain('más de 60 días')
     expect(txt).toContain('https://agente.somossena.com')
     expect(txt).not.toMatch(/preventiva|48-72h|2 semanas|LATAM/i)
+  })
+
+  test('llms.txt sin proveedores internos ni países no confirmados, y sus anclas existen', async ({ request }) => {
+    const txt = await (await request.get('/llms.txt')).text()
+    expect(txt).not.toMatch(/kapso|khipu|mercado ?pago|colombia|méxico|mexico|ecuador/i)
+    const html = await (await request.get('/')).text()
+    const anclas = [...txt.matchAll(/recupera\.somossena\.com\/#([\w-]+)/g)].map((m) => m[1])
+    expect(anclas.length).toBeGreaterThan(0)
+    for (const a of anclas) expect(html, `#${a}`).toContain(`id="${a}"`)
   })
 })
 

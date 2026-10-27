@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Whatsapp from '../shared/WhatsApp'
-import { recuperaFaqJsonLd, recuperaServiceJsonLd } from './data/faqs'
+import { recuperaEntityJsonLd, recuperaFaqJsonLd, recuperaServiceJsonLd } from './data/faqs'
 import { SectionFromQuery } from './SectionFromQuery'
 import { CaseSection } from './sections/CaseForm/CaseSection'
 import { Clients } from './sections/Clients'
@@ -19,6 +19,10 @@ import { UseCases } from './sections/UseCases'
 // Solo el formulario, el CTA fijo de móvil y el botón de WhatsApp se hidratan.
 export const RecuperaPage = () => (
   <div className="min-h-screen flex flex-col font-adobe text-brand-primary-dark text-[17px] leading-[1.55]">
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(recuperaEntityJsonLd) }}
+    />
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(recuperaServiceJsonLd) }}

@@ -45,15 +45,42 @@ export const recuperaFaqJsonLd = {
   })),
 }
 
+const SENA_ORGANIZATION_ID = 'https://www.somossena.com/#organization'
+
+// Referencia a la entidad que define somossena.com (layout.tsx). Su areaServed no se copia:
+// incluye países pendientes de confirmar.
+export const recuperaEntityJsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': SENA_ORGANIZATION_ID,
+      name: 'Sena',
+      alternateName: ['Sena Cobranza', 'Sena LATAM', 'somossena'],
+      url: 'https://www.somossena.com',
+      sameAs: ['https://www.linkedin.com/company/sena-latam/'],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://recupera.somossena.com/#website',
+      name: 'Sena Recupera',
+      url: 'https://recupera.somossena.com',
+      inLanguage: 'es-CL',
+      publisher: { '@id': SENA_ORGANIZATION_ID },
+    },
+  ],
+}
+
 export const recuperaServiceJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Service',
+  '@id': 'https://recupera.somossena.com/#service',
   name: 'Sena Recupera',
   serviceType: 'Cobranza B2B de cartera vencida',
   description:
-    'Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede. Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo. Tasa de recuperación de +85%.',
+    'Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede. Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo.',
   url: 'https://recupera.somossena.com',
-  provider: { '@type': 'Organization', name: 'Sena', url: 'https://www.somossena.com' },
+  provider: { '@id': SENA_ORGANIZATION_ID, '@type': 'Organization', name: 'Sena' },
   areaServed: [
     { '@type': 'Country', name: 'Chile', identifier: 'CL' },
     { '@type': 'Country', name: 'Perú', identifier: 'PE' },
