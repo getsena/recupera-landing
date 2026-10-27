@@ -27,7 +27,7 @@ export const IpConfigInitializer = ({ country }: Props) => {
     if (country === 'Peru') {
       setIpCurrency('PEN')
       setWhatsappCountry({
-        phoneNumber: '958969041',
+        phoneNumber: '918272599',
         countryCode: '+51',
       })
     } else if (country === 'Chile') {

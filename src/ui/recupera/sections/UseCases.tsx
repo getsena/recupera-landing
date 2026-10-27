@@ -1,60 +1,40 @@
-import { Calendar, DollarSign, Globe, MessageCircleOff } from 'lucide-react'
+import { Container, Dot, Eyebrow, SectionTitle } from './shared'
 
-const useCases = [
+const casos = [
   {
-    title: 'Facturas +90 días vencidas',
-    description: 'Clientes corporativos con pagos atrasados que requieren negociación profesional.',
-    icon: Calendar,
+    titulo: 'Facturas con más de 90 días.',
+    detalle: 'Clientes corporativos con pagos atrasados que requieren negociación profesional.',
   },
   {
-    title: 'Deudores que no responden',
-    description: 'Clientes que dejaron de responder. La publicación en DICOM reactiva la conversación.',
-    icon: MessageCircleOff,
+    titulo: 'Clientes que dejaron de responder.',
+    detalle: 'Escalamos con gestión profesional y, cuando corresponde, publicación en DICOM.',
   },
   {
-    title: 'Facturas de alto valor sin gestión activa',
-    description: 'Cuando el monto justifica externalizar con especialistas que trabajan solo a contingencia.',
-    icon: DollarSign,
-  },
-  {
-    title: 'Expansión LATAM',
-    description: 'Empresas operando en múltiples países que necesitan gestión con conocimiento local.',
-    icon: Globe,
+    titulo: 'Facturas de alto valor sin gestión.',
+    detalle: 'Cuando el monto justifica externalizar a un equipo que cobra solo sobre lo recuperado.',
   },
 ]
 
-export const UseCases = () => {
-  return (
-    <div id="casos-uso" className="bg-white py-12 md:py-20">
-      <div className="max-w-[1280px] mx-auto px-4 md:px-12">
-        <div className="text-left mb-12">
-          <h2 className="text-brand-primary-dark text-3xl md:text-4xl font-extrabold mb-4">
-            ¿Tu empresa está en <span className="text-brand-primary">alguno de estos casos?</span>
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {useCases.map((useCase, index) => {
-            const Icon = useCase.icon
-            return (
-              <div
-                key={index}
-                className="bg-linear-to-br from-slate-50 to-white border border-slate-200 rounded-2xl p-8 hover:shadow-lg transition-all group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="bg-brand-primary/10 p-4 rounded-xl group-hover:bg-brand-primary/20 transition-colors shrink-0">
-                    <Icon className="h-6 w-6 text-brand-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-brand-primary-dark text-xl font-bold mb-2">{useCase.title}</h3>
-                    <p className="text-slate-600">{useCase.description}</p>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+export const UseCases = () => (
+  <section id="casos" aria-labelledby="casos-titulo" className="scroll-mt-24">
+    {/* Ancla anterior de esta sección. */}
+    <span id="casos-uso" className="block scroll-mt-24" aria-hidden="true" />
+    <Container className="py-20 md:py-[104px] flex flex-wrap gap-x-[72px] gap-y-10">
+      <div className="flex-[1_1_360px] min-w-0 flex flex-col gap-[18px]">
+        <Eyebrow>Para quién · facturas vencidas hace más de 30 días</Eyebrow>
+        <SectionTitle id="casos-titulo" size="md">
+          ¿Tu empresa está en alguno de estos casos
+          <Dot mark="?" />
+        </SectionTitle>
       </div>
-    </div>
-  )
-}
+      <ul className="flex-[1_1_560px] min-w-0 m-0 p-0 list-none flex flex-col border-t border-border-default">
+        {casos.map((c) => (
+          <li key={c.titulo} className="py-[22px] border-b border-border-default flex flex-col gap-1">
+            <strong className="text-[19px]">{c.titulo}</strong>
+            <span className="text-text-muted">{c.detalle}</span>
+          </li>
+        ))}
+      </ul>
+    </Container>
+  </section>
+)
