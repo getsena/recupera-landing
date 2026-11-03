@@ -47,7 +47,7 @@ test.describe('contenido renderizado en el servidor', () => {
 
   test('metadata, canonical y JSON-LD de Organization, WebSite, Service y FAQPage', async ({ request }) => {
     const html = await (await request.get('/')).text()
-    expect(html).toContain('<title>Sena Recupera · Cobranza B2B de cartera vencida en Chile y Perú</title>')
+    expect(html).toContain('<title>Sena Recupera · Cobranza B2B de cartera vencida</title>')
     expect(html).toContain('<link rel="canonical" href="https://recupera.somossena.com"/>')
     expect(html).toContain('<meta property="og:site_name" content="Sena"/>')
     expect(html).not.toMatch(/<meta name="description" content="[^"]*DICOM/)
