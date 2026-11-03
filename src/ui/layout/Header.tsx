@@ -448,7 +448,7 @@ export const Header = ({ variant }: Props) => {
 
   const redirectLogin = () => {
     const url = ipCurrency === 'PEN' ? 'pe' : ''
-    router.push(`https://app.somossena.com/login?l=${url}&origin=main`)
+    router.push(`https://dashboard.somossena.com/login?l=${url}&origin=main`)
   }
 
   // =========================
