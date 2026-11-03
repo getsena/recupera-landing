@@ -9,7 +9,7 @@ export const OperaBridge = () => (
         </h2>
         <p className="m-0 text-[18px] text-text-body">
           Recupera resuelve lo que ya venció. Para gestionar toda tu cartera desde antes del vencimiento, está{' '}
-          <strong>Ópera</strong>: tu equipo de cobranza externo, desde US$50 al mes.
+          <strong>Ópera</strong>: tu equipo de cobranza externo, desde USD 50 al mes.
         </p>
       </div>
       <PillLink href="https://agente.somossena.com" variant="dark">
