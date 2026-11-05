@@ -11,9 +11,9 @@ import './globals.css'
 import AttributionCapture from '@/ui/shared/AttributionCapture'
 import Providers from './providers'
 
-const TITLE = 'Sena Recupera · Cobranza B2B de cartera vencida en Chile y Perú'
+const TITLE = 'Sena Recupera · Cobranza B2B de cartera vencida'
 const DESCRIPTION =
-  'Recuperamos las facturas que tu empresa ya no pudo cobrar, cuidando la relación donde todavía se puede. Pagas 15% solo sobre lo que recuperamos, sin costo fijo ni ticket mínimo.'
+  'Recuperamos las facturas que tu empresa no pudo cobrar, cuidando la relación donde se puede. Pagas 15% de lo recuperado, sin costo fijo ni ticket mínimo.'
 
 export const metadata: Metadata = {
   title: TITLE,
